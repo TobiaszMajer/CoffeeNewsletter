@@ -1,4 +1,12 @@
-export const mockBeans = {
+import type {
+  Bean,
+  Cafe,
+  Roaster,
+  SavedState,
+  ActivityEntry,
+} from "../types/app";
+
+export const mockBeans: Record<string, Bean> = {
   "guji-natural": {
     id: "guji-natural",
     name: "Guji Perfect",
@@ -50,7 +58,7 @@ export const mockBeans = {
   },
 };
 
-export const mockCafes = {
+export const mockCafes: Record<string, Cafe> = {
   "rosslyn-coffee": {
     id: "rosslyn-coffee",
     name: "Rosslyn Coffee",
@@ -107,7 +115,7 @@ export const mockCafes = {
   },
 };
 
-export const mockRoasters = {
+export const mockRoasters: Record<string, Roaster> = {
   "dark-arts-coffee": {
     id: "dark-arts-coffee",
     name: "Dark Arts Coffee",
@@ -171,7 +179,7 @@ export const mockRoasters = {
   },
 };
 
-export const mockSaved = {
+export const mockSaved: SavedState = {
   beans: [
     {
       id: "guji-natural",
@@ -222,7 +230,7 @@ export const mockSaved = {
   ],
 };
 
-export const mockActivity = [
+export const mockActivity: ActivityEntry[] = [
   {
     id: "guji-natural-1",
     beanId: "guji-natural",

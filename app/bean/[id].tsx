@@ -1,5 +1,4 @@
-import React from "react";
-import { mockBeans } from "../../lib/mock-data";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,16 +7,135 @@ import {
   Pressable,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { mockBeans } from "../../lib/mock-data";
+import { getBeanBySlug, getAvailabilityByBeanId } from "../../lib/catalog";
+import { Alert } from "react-native";
+import { saveEntity, followEntity } from "../../lib/user-actions";
 
+type LiveBean = {
+  id: string;
+  slug: string;
+  name: string;
+  origin: string | null;
+  producer_estate: string | null;
+  process: string | null;
+  roast_style: string | null;
+  flavor_notes: string[] | null;
+  description: string | null;
+  roasters:
+    | {
+        slug: string;
+        name: string;
+      }
+    | {
+        slug: string;
+        name: string;
+      }[]
+    | null;
+};
 
+type LiveAvailability = {
+  freshness_note: string | null;
+  distance_label: string | null;
+  availability_types: string[] | null;
+  cafes:
+    | {
+        slug: string;
+        name: string;
+      }
+    | {
+        slug: string;
+        name: string;
+      }[]
+    | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 export default function BeanDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const slug = id ?? "guji-natural";
 
-  const bean = mockBeans[id ?? "guji-natural"] ?? mockBeans["guji-natural"];
-  
+  const fallback = mockBeans[slug] ?? mockBeans["guji-natural"];
+
+  const [liveBean, setLiveBean] = useState<LiveBean | null>(null);
+  const [liveAvailability, setLiveAvailability] = useState<LiveAvailability[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+
+        const bean = await getBeanBySlug(slug);
+        if (!mounted) return;
+
+        if (bean) {
+          setLiveBean(bean);
+
+          const availability = await getAvailabilityByBeanId(bean.id);
+          if (!mounted) return;
+          setLiveAvailability(availability);
+        }
+      } catch (err) {
+        console.error("Failed to load bean", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  const liveRoaster = firstRelation(liveBean?.roasters);
+
+  const beanTitle = liveBean?.name ?? fallback.name;
+  const beanOrigin = liveBean?.origin ?? fallback.origin;
+  const beanProcess = liveBean?.process ?? fallback.process;
+  const beanRoast = liveBean?.roast_style ?? fallback.roast;
+  const beanRoasterName = liveRoaster?.name ?? fallback.roaster;
+  const beanRoasterSlug = liveRoaster?.slug ?? fallback.roasterSlug;
+  const beanNotes = liveBean?.flavor_notes ?? fallback.notes;
+
+  const cafes = useMemo(() => {
+    if (liveAvailability.length > 0) {
+      return liveAvailability
+        .map((row) => {
+          const cafe = firstRelation(row.cafes);
+          if (!cafe) return null;
+
+          return {
+            name: cafe.name,
+            slug: cafe.slug,
+            distance: row.distance_label ?? "Nearby",
+            freshness: row.freshness_note ?? "Recently updated",
+            types: row.availability_types ?? [],
+          };
+        })
+        .filter(Boolean) as {
+        name: string;
+        slug: string;
+        distance: string;
+        freshness: string;
+        types: string[];
+      }[];
+    }
+
+    return fallback.cafes;
+  }, [liveAvailability, fallback.cafes]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -36,22 +154,24 @@ export default function BeanDetailScreen() {
         <View style={styles.card}>
           <View style={styles.topMetaRow}>
             <Text style={styles.originMeta}>
-              {bean.origin} • {bean.process}
+              {beanOrigin} • {beanProcess}
             </Text>
             <View style={styles.roastChip}>
-              <Text style={styles.roastChipText}>{bean.roast}</Text>
+              <Text style={styles.roastChipText}>{beanRoast}</Text>
             </View>
           </View>
 
-          <Text style={styles.title}>{bean.name}</Text>
-          <Text style={styles.roaster}>Roaster: {bean.roaster}</Text>
+          <Text style={styles.title}>{beanTitle}</Text>
+          <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
+            <Text style={styles.roaster}>Roaster: {beanRoasterName}</Text>
+          </Pressable>
 
           <View style={styles.matchBox}>
-            <Text style={styles.matchText}>{bean.matchText}</Text>
+            <Text style={styles.matchText}>{fallback.matchText}</Text>
           </View>
 
           <View style={styles.availabilityRow}>
-            {bean.availability.map((item) => (
+            {fallback.availability.map((item) => (
               <View key={item} style={styles.availabilityChip}>
                 <Text style={styles.availabilityChipText}>{item}</Text>
               </View>
@@ -59,19 +179,45 @@ export default function BeanDetailScreen() {
           </View>
 
           <View style={styles.actionRow}>
-            <Pressable style={styles.primaryButton}>
+            <Pressable
+              style={styles.primaryButton}
+              onPress={async () => {
+                try {
+                  await saveEntity("bean", slug);
+                  Alert.alert("Saved", "Bean saved to your collection.");
+                } catch (error) {
+                  console.error(error);
+                  Alert.alert("Could not save bean");
+                }
+              }}
+            >
               <Text style={styles.primaryButtonText}>Save Bean</Text>
             </Pressable>
 
-            <Pressable style={styles.secondaryButton}>
+            <Pressable
+              style={styles.secondaryButton}
+              onPress={async () => {
+                try {
+                  await followEntity("roaster", beanRoasterSlug);
+                  Alert.alert("Following", "Roaster added to your follows.");
+                } catch (error) {
+                  console.error(error);
+                  Alert.alert("Could not follow roaster");
+                }
+              }}
+            >
               <Text style={styles.secondaryButtonText}>Follow Roaster</Text>
             </Pressable>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Flavor Notes</Text>
+        <View style={styles.sectionHeaderSimple}>
+          <Text style={styles.sectionTitle}>Flavor Notes</Text>
+          {loading ? <ActivityIndicator color="#9A4600" /> : null}
+        </View>
+
         <View style={styles.notesWrap}>
-          {bean.notes.map((note) => (
+          {beanNotes.map((note) => (
             <View key={note} style={styles.noteChip}>
               <Text style={styles.noteChipText}>{note}</Text>
             </View>
@@ -100,11 +246,11 @@ export default function BeanDetailScreen() {
         </View>
 
         <View style={styles.cafesWrap}>
-          {bean.cafes.map((cafe) => (
+          {cafes.map((cafe) => (
             <Pressable
-              key={`${bean.name}-${cafe.name}`}
+              key={`${beanTitle}-${cafe.slug}`}
               style={styles.cafeCard}
-              onPress={() => router.push(`/cafe/${slugify(cafe.name)}`)}
+              onPress={() => router.push(`/cafe/${cafe.slug}`)}
             >
               <View style={styles.cafeImage} />
 
@@ -130,10 +276,6 @@ export default function BeanDetailScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function slugify(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "-");
 }
 
 const styles = StyleSheet.create({
@@ -263,6 +405,14 @@ const styles = StyleSheet.create({
     color: "#9A4600",
     fontSize: 16,
     fontWeight: "700",
+  },
+  sectionHeaderSimple: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 24,
+    marginTop: 26,
+    marginBottom: 14,
   },
   sectionTitle: {
     fontSize: 28,

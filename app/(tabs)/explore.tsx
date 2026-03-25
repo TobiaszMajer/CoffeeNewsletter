@@ -1,23 +1,58 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { getExploreBeans } from "../../lib/catalog";
 
 type Mode = "map" | "list";
 
-const FILTERS = [
-  "Berry & Floral",
-  "Light Roast",
-  "Filter",
-  "Open now",
-];
+type LiveExploreBean = {
+  id: string;
+  slug: string;
+  name: string;
+  roast_style: string | null;
+  flavor_notes: string[] | null;
+  roasters:
+    | {
+        slug: string;
+        name: string;
+      }
+    | {
+        slug: string;
+        name: string;
+      }[]
+    | null;
+  cafe_bean_availability:
+    | {
+        freshness_note: string | null;
+        distance_label: string | null;
+        availability_types: string[] | null;
+        cafes:
+          | {
+              slug: string;
+              name: string;
+            }
+          | {
+              slug: string;
+              name: string;
+            }[]
+          | null;
+      }[]
+    | null;
+};
 
-const RESULTS = [
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+const FALLBACK_RESULTS = [
   {
     id: "guji-natural",
     name: "Guji Natural",
@@ -40,11 +75,62 @@ const RESULTS = [
   },
 ];
 
+const FILTERS = [
+  "Berry & Floral",
+  "Light Roast",
+  "Filter",
+  "Open now",
+];
+
 export default function ExploreScreen() {
   const [mode, setMode] = useState<Mode>("map");
   const [selectedFilter, setSelectedFilter] = useState<string>("Berry & Floral");
+  const [liveBeans, setLiveBeans] = useState<LiveExploreBean[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const visibleResults = useMemo(() => RESULTS, []);
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+        const data = await getExploreBeans();
+        if (!mounted) return;
+        setLiveBeans(data as LiveExploreBean[]);
+      } catch (err) {
+        console.error("Failed to load explore beans", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const visibleResults = useMemo(() => {
+    if (liveBeans.length === 0) return FALLBACK_RESULTS;
+
+    return liveBeans.map((bean) => {
+      const roaster = firstRelation(bean.roasters);
+      const availability = bean.cafe_bean_availability?.[0];
+      const cafe = firstRelation(availability?.cafes);
+
+      return {
+        id: bean.slug,
+        name: bean.name,
+        roaster: roaster?.name ?? "Unknown roaster",
+        venue: cafe?.name ?? "Nearby café",
+        distance: availability?.distance_label ?? "Nearby",
+        notes: (bean.flavor_notes ?? []).slice(0, 2),
+        type: availability?.availability_types?.[0] ?? bean.roast_style ?? "Coffee",
+        freshness: availability?.freshness_note ?? "Recently updated",
+      };
+    });
+  }, [liveBeans]);
 
   return (
     <ScrollView
@@ -52,7 +138,10 @@ export default function ExploreScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.headerTitle}>Explore</Text>
+      <View style={styles.headerRow}>
+        <Text style={styles.headerTitle}>Explore</Text>
+        {loading ? <ActivityIndicator color="#9A4600" /> : null}
+      </View>
 
       <View style={styles.searchBox}>
         <Text style={styles.searchText}>Search beans, roasters, or cafés...</Text>
@@ -189,12 +278,17 @@ const styles = StyleSheet.create({
     paddingTop: 64,
     paddingBottom: 32,
   },
+  headerRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   headerTitle: {
     fontSize: 38,
     lineHeight: 42,
     color: "#1C1C19",
     fontWeight: "700",
-    marginBottom: 20,
   },
   searchBox: {
     backgroundColor: "#F1ECE5",

@@ -1,5 +1,4 @@
-import React from "react";
-import { mockRoasters } from "../../lib/mock-data";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,15 +7,88 @@ import {
   Pressable,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { mockRoasters } from "../../lib/mock-data";
+import { getRoasterBySlug, getBeansByRoasterId } from "../../lib/catalog";
+import { Alert } from "react-native";
+import { followEntity } from "../../lib/user-actions";
+type LiveRoaster = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  flavor_direction: string | null;
+};
 
-
+type LiveBean = {
+  slug: string;
+  name: string;
+  flavor_notes: string[] | null;
+  roast_style: string | null;
+};
 
 export default function RoasterDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const roaster =
-    mockRoasters[id ?? "dark-arts-coffee"] ?? mockRoasters["dark-arts-coffee"];
+  const slug = id ?? "dark-arts-coffee";
+
+  const fallback = mockRoasters[slug] ?? mockRoasters["dark-arts-coffee"];
+
+  const [liveRoaster, setLiveRoaster] = useState<LiveRoaster | null>(null);
+  const [liveBeans, setLiveBeans] = useState<LiveBean[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+
+        const roaster = await getRoasterBySlug(slug);
+
+        if (!mounted) return;
+
+        if (roaster) {
+          setLiveRoaster(roaster);
+
+          const beans = await getBeansByRoasterId(roaster.id);
+          if (!mounted) return;
+          setLiveBeans(beans);
+        }
+      } catch (err) {
+        console.error("Failed to load roaster", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  const title = liveRoaster?.name ?? fallback.name;
+  const description = liveRoaster?.description ?? fallback.description;
+  const flavorDirection =
+    liveRoaster?.flavor_direction ?? fallback.flavorDirection;
+
+  const featuredBeans = useMemo(() => {
+    if (liveBeans.length > 0) {
+      return liveBeans.map((bean) => ({
+        id: bean.slug,
+        name: bean.name,
+        notes: bean.flavor_notes ?? [],
+        roast: bean.roast_style ?? "Roast",
+        availability: ["See details"],
+      }));
+    }
+
+    return fallback.featuredBeans;
+  }, [liveBeans, fallback.featuredBeans]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -35,26 +107,37 @@ export default function RoasterDetailScreen() {
 
         <View style={styles.topCard}>
           <Text style={styles.eyebrow}>Roaster</Text>
-          <Text style={styles.title}>{roaster.name}</Text>
-          <Text style={styles.description}>{roaster.description}</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.description}>{description}</Text>
 
           <View style={styles.flavorBox}>
             <Text style={styles.flavorLabel}>Flavor direction</Text>
-            <Text style={styles.flavorText}>{roaster.flavorDirection}</Text>
+            <Text style={styles.flavorText}>{flavorDirection}</Text>
           </View>
 
-          <Pressable style={styles.followButton}>
+          <Pressable
+            style={styles.followButton}
+            onPress={async () => {
+              try {
+                await followEntity("roaster", slug);
+                Alert.alert("Following", "Roaster added to your follows.");
+              } catch (error) {
+                console.error(error);
+                Alert.alert("Could not follow roaster");
+              }
+            }}
+          >
             <Text style={styles.followButtonText}>Follow Roaster</Text>
           </Pressable>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Featured Beans</Text>
-          <Text style={styles.sectionLink}>See all</Text>
+          {loading ? <ActivityIndicator color="#9A4600" /> : null}
         </View>
 
         <View style={styles.beansWrap}>
-          {roaster.featuredBeans.map((bean) => (
+          {featuredBeans.map((bean) => (
             <Pressable
               key={bean.id}
               style={styles.beanCard}
@@ -92,7 +175,7 @@ export default function RoasterDetailScreen() {
         </View>
 
         <View style={styles.cafesWrap}>
-          {roaster.nearbyCafes.map((cafe) => (
+          {fallback.nearbyCafes.map((cafe) => (
             <Pressable
               key={cafe.id}
               style={styles.cafeCard}
@@ -116,17 +199,9 @@ export default function RoasterDetailScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: "#FCF9F4",
-  },
-  screen: {
-    flex: 1,
-    backgroundColor: "#FCF9F4",
-  },
-  content: {
-    paddingBottom: 32,
-  },
+  safeArea: { flex: 1, backgroundColor: "#FCF9F4" },
+  screen: { flex: 1, backgroundColor: "#FCF9F4" },
+  content: { paddingBottom: 32 },
   hero: {
     height: 280,
     backgroundColor: "#7B5B47",
@@ -141,10 +216,7 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     borderRadius: 999,
   },
-  backText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
+  backText: { color: "#FFFFFF", fontWeight: "600" },
   topCard: {
     backgroundColor: "#F1ECE5",
     marginTop: -28,
@@ -166,11 +238,7 @@ const styles = StyleSheet.create({
     color: "#1C1C19",
     fontWeight: "700",
   },
-  description: {
-    color: "#554339",
-    fontSize: 16,
-    lineHeight: 24,
-  },
+  description: { color: "#554339", fontSize: 16, lineHeight: 24 },
   flavorBox: {
     backgroundColor: "#FCF9F4",
     borderRadius: 18,
@@ -184,22 +252,14 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
     textTransform: "uppercase",
   },
-  flavorText: {
-    color: "#7D3400",
-    fontSize: 15,
-    fontWeight: "600",
-  },
+  flavorText: { color: "#7D3400", fontSize: 15, fontWeight: "600" },
   followButton: {
     backgroundColor: "#9A4600",
     paddingVertical: 16,
     borderRadius: 999,
     alignItems: "center",
   },
-  followButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "700",
-  },
+  followButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -214,15 +274,8 @@ const styles = StyleSheet.create({
     color: "#1C1C19",
     fontWeight: "700",
   },
-  sectionLink: {
-    color: "#9A4600",
-    fontSize: 14,
-    fontWeight: "700",
-  },
-  beansWrap: {
-    gap: 14,
-    paddingHorizontal: 24,
-  },
+  sectionLink: { color: "#9A4600", fontSize: 14, fontWeight: "700" },
+  beansWrap: { gap: 14, paddingHorizontal: 24 },
   beanCard: {
     backgroundColor: "#F1ECE5",
     borderRadius: 24,
@@ -236,10 +289,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     backgroundColor: "#B89D88",
   },
-  beanBody: {
-    flex: 1,
-    gap: 10,
-  },
+  beanBody: { flex: 1, gap: 10 },
   beanName: {
     fontSize: 22,
     lineHeight: 26,
@@ -253,42 +303,23 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 1.1,
   },
-  notesWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  notesWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   noteChip: {
     backgroundColor: "#FCF9F4",
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
   },
-  noteChipText: {
-    color: "#554339",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  availabilityWrap: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-  },
+  noteChipText: { color: "#554339", fontSize: 12, fontWeight: "600" },
+  availabilityWrap: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   availabilityChip: {
     backgroundColor: "#EFE7DE",
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
   },
-  availabilityChipText: {
-    color: "#7D3400",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  cafesWrap: {
-    gap: 14,
-    paddingHorizontal: 24,
-  },
+  availabilityChipText: { color: "#7D3400", fontSize: 12, fontWeight: "700" },
+  cafesWrap: { gap: 14, paddingHorizontal: 24 },
   cafeCard: {
     backgroundColor: "#F1ECE5",
     borderRadius: 24,
@@ -302,29 +333,13 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     backgroundColor: "#C4AF9E",
   },
-  cafeBody: {
-    flex: 1,
-    gap: 8,
-    justifyContent: "center",
-  },
+  cafeBody: { flex: 1, gap: 8, justifyContent: "center" },
   cafeTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     gap: 8,
   },
-  cafeName: {
-    flex: 1,
-    fontSize: 20,
-    color: "#1C1C19",
-    fontWeight: "700",
-  },
-  cafeDistance: {
-    color: "#7A675C",
-    fontSize: 13,
-  },
-  cafeFreshness: {
-    color: "#9A4600",
-    fontSize: 13,
-    fontWeight: "700",
-  },
+  cafeName: { flex: 1, fontSize: 20, color: "#1C1C19", fontWeight: "700" },
+  cafeDistance: { color: "#7A675C", fontSize: 13 },
+  cafeFreshness: { color: "#9A4600", fontSize: 13, fontWeight: "700" },
 });

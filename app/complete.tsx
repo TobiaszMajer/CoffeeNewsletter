@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,12 @@ import {
   StatusBar,
   ImageBackground,
 } from "react-native";
+import { Alert } from "react-native";
+import { ensureProfile } from "../lib/auth";
 import { router } from "expo-router";
 
 export default function CompleteScreen() {
+  const [loading, setLoading] = useState(false);
   return (
     <ImageBackground
       source={{
@@ -69,11 +72,24 @@ export default function CompleteScreen() {
           </View>
 
           <Pressable
-            style={styles.primaryButton}
-            onPress={() => router.replace("/home")}
-          >
-            <Text style={styles.primaryButtonText}>Continue as guest</Text>
-          </Pressable>
+            style={[styles.primaryButton, loading && { opacity: 0.7 }]}
+            onPress={async () => {
+            try {
+              setLoading(true);
+              await ensureProfile();
+              router.replace("/(tabs)/home");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Could not start guest session");
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          <Text style={styles.primaryButtonText}>
+            {loading ? "Starting..." : "Continue as guest"}
+          </Text>
+        </Pressable>
 
           <Text style={styles.footerText}>
             You can create an account later.

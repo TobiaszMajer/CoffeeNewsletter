@@ -1,5 +1,4 @@
-import React from "react";
-import { mockCafes } from "../../lib/mock-data";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,14 +7,155 @@ import {
   Pressable,
   SafeAreaView,
   StatusBar,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { mockCafes } from "../../lib/mock-data";
+import { getCafeBySlug, getCafeBeans } from "../../lib/catalog";
+import { Alert } from "react-native";
+import { saveEntity, followEntity } from "../../lib/user-actions";
 
+type LiveCafe = {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  neighborhood: string | null;
+  city: string | null;
+  address: string | null;
+  hours_text: string | null;
+  tags: string[] | null;
+  updated_at: string | null;
+};
 
+type LiveCafeBean = {
+  freshness_note: string | null;
+  availability_types: string[] | null;
+  beans:
+    | {
+        slug: string;
+        name: string;
+        flavor_notes: string[] | null;
+        roasters:
+          | {
+              slug: string;
+              name: string;
+            }
+          | {
+              slug: string;
+              name: string;
+            }[]
+          | null;
+      }
+    | {
+        slug: string;
+        name: string;
+        flavor_notes: string[] | null;
+        roasters:
+          | {
+              slug: string;
+              name: string;
+            }
+          | {
+              slug: string;
+              name: string;
+            }[]
+          | null;
+      }[]
+    | null;
+};
+
+function firstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) return null;
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
+
+function formatUpdatedLabel(value: string | null) {
+  if (!value) return "Recently updated";
+  return "Updated recently";
+}
 
 export default function CafeDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const cafe = mockCafes[id ?? "rosslyn-coffee"] ?? mockCafes["rosslyn-coffee"];
+  const slug = id ?? "rosslyn-coffee";
+
+  const fallback = mockCafes[slug] ?? mockCafes["rosslyn-coffee"];
+
+  const [liveCafe, setLiveCafe] = useState<LiveCafe | null>(null);
+  const [liveBeans, setLiveBeans] = useState<LiveCafeBean[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function load() {
+      try {
+        setLoading(true);
+
+        const cafe = await getCafeBySlug(slug);
+        if (!mounted) return;
+
+        if (cafe) {
+          setLiveCafe(cafe);
+
+          const beans = await getCafeBeans(cafe.id);
+          if (!mounted) return;
+          setLiveBeans(beans as LiveCafeBean[]);
+        }
+      } catch (err) {
+        console.error("Failed to load cafe", err);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    }
+
+    load();
+
+    return () => {
+      mounted = false;
+    };
+  }, [slug]);
+
+  const title = liveCafe?.name ?? fallback.name;
+  const area = liveCafe?.neighborhood ?? fallback.area;
+  const description = liveCafe?.description ?? fallback.description;
+  const tags = liveCafe?.tags ?? fallback.vibeTags;
+  const updated = formatUpdatedLabel(liveCafe?.updated_at) ?? fallback.updated;
+  const hours = liveCafe?.hours_text ?? fallback.hours;
+  const address = liveCafe?.address ?? fallback.address;
+
+  const beans = useMemo(() => {
+    if (liveBeans.length > 0) {
+      return liveBeans
+        .map((row) => {
+          const bean = firstRelation(row.beans);
+          if (!bean) return null;
+
+          const roaster = firstRelation(bean.roasters);
+
+          return {
+            id: bean.slug,
+            name: bean.name,
+            roaster: roaster?.name ?? "Unknown roaster",
+            roasterSlug: roaster?.slug ?? "",
+            notes: (bean.flavor_notes ?? []).slice(0, 2),
+            types: row.availability_types ?? [],
+            match: row.freshness_note ?? undefined,
+          };
+        })
+        .filter(Boolean) as {
+        id: string;
+        name: string;
+        roaster: string;
+        roasterSlug: string;
+        notes: string[];
+        types: string[];
+        match?: string;
+      }[];
+    }
+
+    return fallback.beans;
+  }, [liveBeans, fallback.beans]);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -35,40 +175,60 @@ export default function CafeDetailScreen() {
         <View style={styles.topCard}>
           <View style={styles.topRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.area}>{cafe.area}</Text>
-              <Text style={styles.title}>{cafe.name}</Text>
+              <Text style={styles.area}>{area}</Text>
+              <Text style={styles.title}>{title}</Text>
             </View>
 
             <View style={styles.saveWrap}>
-              <Pressable style={styles.iconButton}>
+              <Pressable style={styles.iconButton}
+                onPress={async () => {
+                  try {
+                    await saveEntity("cafe", slug);
+                    Alert.alert("Saved", "Café saved to your collection.");
+                  } catch (error) {
+                    console.error(error);
+                    Alert.alert("Could not save café");
+                  }
+                }}
+              >
                 <Text style={styles.iconButtonText}>⌑</Text>
               </Pressable>
-              <Pressable style={styles.iconButton}>
+              <Pressable style={styles.iconButton}
+                onPress={async () => {
+                  try {
+                    await followEntity("cafe", slug);
+                    Alert.alert("Following", "Café added to your follows.");
+                  } catch (error) {
+                    console.error(error);
+                    Alert.alert("Could not follow café");
+                  }
+                }}
+              >
                 <Text style={styles.iconButtonText}>＋</Text>
               </Pressable>
             </View>
           </View>
 
-          <Text style={styles.description}>{cafe.description}</Text>
+          <Text style={styles.description}>{description}</Text>
 
           <View style={styles.tagsWrap}>
-            {cafe.vibeTags.map((tag) => (
+            {tags.map((tag) => (
               <View key={tag} style={styles.tag}>
                 <Text style={styles.tagText}>{tag}</Text>
               </View>
             ))}
           </View>
 
-          <Text style={styles.updated}>{cafe.updated}</Text>
+          <Text style={styles.updated}>{updated}</Text>
         </View>
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>On the Bar</Text>
-          <Text style={styles.sectionLink}>See all</Text>
+          {loading ? <ActivityIndicator color="#9A4600" /> : null}
         </View>
 
         <View style={styles.beansWrap}>
-          {cafe.beans.map((bean) => (
+          {beans.map((bean) => (
             <Pressable
               key={bean.id}
               style={styles.beanCard}
@@ -77,9 +237,15 @@ export default function CafeDetailScreen() {
               <View style={styles.beanTopRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.beanName}>{bean.name}</Text>
-                  <Pressable onPress={() => router.push(`/roaster/${slugify(bean.roaster)}`)}>
+                  {bean.roasterSlug ? (
+                    <Pressable
+                      onPress={() => router.push(`/roaster/${bean.roasterSlug}`)}
+                    >
+                      <Text style={styles.beanRoaster}>by {bean.roaster}</Text>
+                    </Pressable>
+                  ) : (
                     <Text style={styles.beanRoaster}>by {bean.roaster}</Text>
-                  </Pressable>
+                  )}
                 </View>
 
                 {bean.match ? (
@@ -113,18 +279,18 @@ export default function CafeDetailScreen() {
         <View style={styles.detailsCard}>
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Hours</Text>
-            <Text style={styles.detailValue}>{cafe.hours}</Text>
+            <Text style={styles.detailValue}>{hours}</Text>
           </View>
 
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Address</Text>
-            <Text style={styles.detailValue}>{cafe.address}</Text>
+            <Text style={styles.detailValue}>{address}</Text>
           </View>
 
-          {cafe.brunchNote ? (
+          {fallback.brunchNote ? (
             <View style={styles.detailRow}>
               <Text style={styles.detailLabel}>Food</Text>
-              <Text style={styles.detailValue}>{cafe.brunchNote}</Text>
+              <Text style={styles.detailValue}>{fallback.brunchNote}</Text>
             </View>
           ) : null}
 
@@ -135,10 +301,6 @@ export default function CafeDetailScreen() {
       </ScrollView>
     </SafeAreaView>
   );
-}
-
-function slugify(value: string) {
-  return value.toLowerCase().replace(/\s+/g, "-");
 }
 
 const styles = StyleSheet.create({
@@ -241,22 +403,17 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
     paddingHorizontal: 24,
     marginTop: 26,
     marginBottom: 14,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   sectionTitle: {
     fontSize: 28,
     lineHeight: 32,
     color: "#1C1C19",
-    fontWeight: "700",
-  },
-  sectionLink: {
-    color: "#9A4600",
-    fontSize: 14,
     fontWeight: "700",
   },
   beansWrap: {

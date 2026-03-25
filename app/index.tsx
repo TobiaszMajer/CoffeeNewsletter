@@ -9,6 +9,7 @@ import {
   StatusBar,
 } from "react-native";
 import { router } from "expo-router";
+import DevSkipButton from "../components/DevSkipButton";
 
 export default function WelcomeScreen() {
   return (
@@ -25,6 +26,7 @@ export default function WelcomeScreen() {
       <SafeAreaView style={styles.safeArea}>
         <View style={styles.topBar}>
           <Text style={styles.brand}>Oat & Ember</Text>
+          <DevSkipButton />
         </View>
 
         <View style={styles.content}>
@@ -69,6 +71,9 @@ const styles = StyleSheet.create({
   },
   topBar: {
     paddingTop: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   brand: {
     fontSize: 24,
