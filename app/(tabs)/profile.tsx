@@ -1,78 +1,169 @@
-import React from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import { getProfileSummary } from "../../lib/catalog";
+
+type ProfileSummary = {
+  identityTitle: string;
+  identityText: string;
+  identityTags: string[];
+  counts: {
+    savedBeans: number;
+    savedCafes: number;
+    savedRoasters: number;
+  };
+  following: {
+    cafes: { id: string; name: string; subtitle: string }[];
+    roasters: { id: string; name: string; subtitle: string }[];
+  };
+};
 
 export default function ProfileScreen() {
+  const [loading, setLoading] = useState(true);
+  const [profile, setProfile] = useState<ProfileSummary>({
+    identityTitle: "Guest profile",
+    identityText:
+      "You are using a guest profile. Saved coffees and follows will shape this account over time.",
+    identityTags: [],
+    counts: {
+      savedBeans: 0,
+      savedCafes: 0,
+      savedRoasters: 0,
+    },
+    following: {
+      cafes: [],
+      roasters: [],
+    },
+  });
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function load() {
+        try {
+          setLoading(true);
+          const data = await getProfileSummary();
+          if (!isActive) return;
+          setProfile(data);
+        } catch (err) {
+          if (isActive) {
+            console.error("Failed to load profile summary", err);
+          }
+        } finally {
+          if (isActive) {
+            setLoading(false);
+          }
+        }
+      }
+
+      load();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
+
+  const followingItems = [
+    ...profile.following.cafes.map((item) => ({
+      ...item,
+      type: "cafe" as const,
+    })),
+    ...profile.following.roasters.map((item) => ({
+      ...item,
+      type: "roaster" as const,
+    })),
+  ];
+
   return (
     <ScrollView
       style={styles.screen}
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>Profile</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Profile</Text>
+        {loading ? <ActivityIndicator color="#9A4600" /> : null}
+      </View>
+
       <Text style={styles.subtitle}>
         Your taste identity, saved collections, and the places you follow.
       </Text>
 
       <View style={styles.identityCard}>
         <Text style={styles.identityEyebrow}>Taste identity</Text>
-        <Text style={styles.identityTitle}>Balanced & warm</Text>
-        <Text style={styles.identityText}>
-          You tend to lean toward caramel sweetness, soft fruit, and coffees that stay elegant without becoming too sharp.
-        </Text>
+        <Text style={styles.identityTitle}>{profile.identityTitle}</Text>
+        <Text style={styles.identityText}>{profile.identityText}</Text>
 
         <View style={styles.tagsRow}>
-          <View style={styles.tag}><Text style={styles.tagText}>Caramel</Text></View>
-          <View style={styles.tag}><Text style={styles.tagText}>Nutty</Text></View>
-          <View style={styles.tag}><Text style={styles.tagText}>Balanced</Text></View>
-          <View style={styles.tag}><Text style={styles.tagText}>Milk drinks</Text></View>
+          {profile.identityTags.length > 0 ? (
+            profile.identityTags.map((tag) => (
+              <View key={tag} style={styles.tag}>
+                <Text style={styles.tagText}>{tag}</Text>
+              </View>
+            ))
+          ) : (
+            <View style={styles.tag}>
+              <Text style={styles.tagText}>Guest</Text>
+            </View>
+          )}
         </View>
       </View>
 
       <View style={styles.countsRow}>
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>2</Text>
+          <Text style={styles.countValue}>{profile.counts.savedBeans}</Text>
           <Text style={styles.countLabel}>Saved beans</Text>
         </View>
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>2</Text>
+          <Text style={styles.countValue}>{profile.counts.savedCafes}</Text>
           <Text style={styles.countLabel}>Saved cafés</Text>
         </View>
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>2</Text>
+          <Text style={styles.countValue}>{profile.counts.savedRoasters}</Text>
           <Text style={styles.countLabel}>Roasters</Text>
         </View>
       </View>
 
       <Text style={styles.sectionTitle}>Following</Text>
 
-      <Pressable
-        style={styles.followCard}
-        onPress={() => router.push("/cafe/rosslyn-coffee")}
-      >
-        <View style={styles.followImageSoft} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.followTitle}>Rosslyn Coffee</Text>
-          <Text style={styles.followSubtitle}>City Center • Café</Text>
+      {followingItems.length === 0 ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Nothing followed yet</Text>
+          <Text style={styles.emptyText}>
+            Follow a café or roaster and it will appear here.
+          </Text>
         </View>
-      </Pressable>
-
-      <Pressable
-        style={styles.followCard}
-        onPress={() => router.push("/roaster/dark-arts-coffee")}
-      >
-        <View style={styles.followImageDark} />
-        <View style={{ flex: 1 }}>
-          <Text style={styles.followTitle}>Dark Arts Coffee</Text>
-          <Text style={styles.followSubtitle}>Roaster • Berry-forward and vibrant</Text>
-        </View>
-      </Pressable>
+      ) : (
+        followingItems.map((item) => (
+          <Pressable
+            key={`${item.type}-${item.id}`}
+            style={styles.followCard}
+            onPress={() =>
+              router.push(
+                item.type === "cafe" ? `/cafe/${item.id}` : `/roaster/${item.id}`
+              )
+            }
+          >
+            <View
+              style={item.type === "cafe" ? styles.followImageSoft : styles.followImageDark}
+            />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.followTitle}>{item.name}</Text>
+              <Text style={styles.followSubtitle}>{item.subtitle}</Text>
+            </View>
+          </Pressable>
+        ))
+      )}
 
       <Text style={styles.sectionTitle}>Settings</Text>
 
@@ -97,6 +188,11 @@ export default function ProfileScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FCF9F4" },
   content: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 32 },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   title: {
     fontSize: 38,
     lineHeight: 42,
@@ -168,6 +264,24 @@ const styles = StyleSheet.create({
     color: "#1C1C19",
     fontWeight: "700",
     marginBottom: 14,
+  },
+  emptyCard: {
+    backgroundColor: "#F1ECE5",
+    borderRadius: 24,
+    padding: 18,
+    marginBottom: 16,
+  },
+  emptyTitle: {
+    fontSize: 22,
+    lineHeight: 26,
+    color: "#1C1C19",
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#554339",
+    fontSize: 15,
+    lineHeight: 22,
   },
   followCard: {
     backgroundColor: "#F1ECE5",

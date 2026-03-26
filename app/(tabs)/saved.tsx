@@ -1,74 +1,90 @@
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   Pressable,
+  ActivityIndicator,
 } from "react-native";
 import { router } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+import { getSavedCatalog } from "../../lib/catalog";
 
 type SavedTab = "Beans" | "Cafés" | "Roasters";
 
-const SAVED_BEANS = [
-  {
-    id: "guji-natural",
-    name: "Guji Natural",
-    roaster: "Dark Arts Coffee",
-    notes: ["Blueberry", "Violet"],
-    nearby: "Rosslyn Coffee",
-    freshness: "Updated today",
-  },
-  {
-    id: "washed-yirgacheffe",
-    name: "Washed Yirgacheffe",
-    roaster: "Square Mile",
-    notes: ["Jasmine", "Bergamot"],
-    nearby: "Prufrock Coffee",
-    freshness: "Updated 4h ago",
-  },
-];
-
-const SAVED_CAFES = [
-  {
-    id: "rosslyn-coffee",
-    name: "Rosslyn Coffee",
-    area: "City Center",
-    tags: ["Work-friendly", "Brunch"],
-    cue: "2 beans matching your profile",
-  },
-  {
-    id: "prufrock-coffee",
-    name: "Prufrock Coffee",
-    area: "Bloomsbury",
-    tags: ["Brunch", "Outdoor seating"],
-    cue: "Fresh espresso option nearby",
-  },
-];
-
-const SAVED_ROASTERS = [
-  {
-    id: "dark-arts-coffee",
-    name: "Dark Arts Coffee",
-    direction: "Berry-forward and vibrant",
-    update: "New drop nearby",
-  },
-  {
-    id: "square-mile",
-    name: "Square Mile",
-    direction: "Clean, citrus, balanced",
-    update: "Updated 4h ago",
-  },
-];
+type SavedCatalog = {
+  beans: {
+    id: string;
+    name: string;
+    roaster: string;
+    notes: string[];
+    nearby: string;
+    freshness: string;
+  }[];
+  cafes: {
+    id: string;
+    name: string;
+    area: string;
+    tags: string[];
+    cue: string;
+  }[];
+  roasters: {
+    id: string;
+    name: string;
+    direction: string;
+    update: string;
+  }[];
+};
 
 export default function SavedScreen() {
   const [activeTab, setActiveTab] = useState<SavedTab>("Beans");
+  const [saved, setSaved] = useState<SavedCatalog>({
+    beans: [],
+    cafes: [],
+    roasters: [],
+  });
+  const [loading, setLoading] = useState(true);
+
+  useFocusEffect(
+    useCallback(() => {
+      let isActive = true;
+
+      async function load() {
+        try {
+          setLoading(true);
+          const data = await getSavedCatalog();
+          if (!isActive) return;
+          setSaved(data);
+        } catch (err) {
+          if (isActive) {
+            console.error("Failed to load saved catalog", err);
+          }
+        } finally {
+          if (isActive) {
+            setLoading(false);
+          }
+        }
+      }
+
+      load();
+
+      return () => {
+        isActive = false;
+      };
+    }, [])
+  );
 
   const countText = useMemo(() => {
-    if (activeTab === "Beans") return `${SAVED_BEANS.length} saved`;
-    if (activeTab === "Cafés") return `${SAVED_CAFES.length} saved`;
-    return `${SAVED_ROASTERS.length} saved`;
-  }, [activeTab]);
+    if (activeTab === "Beans") return `${saved.beans.length} saved`;
+    if (activeTab === "Cafés") return `${saved.cafes.length} saved`;
+    return `${saved.roasters.length} saved`;
+  }, [activeTab, saved]);
+
+  const isEmpty =
+    (activeTab === "Beans" && saved.beans.length === 0) ||
+    (activeTab === "Cafés" && saved.cafes.length === 0) ||
+    (activeTab === "Roasters" && saved.roasters.length === 0);
 
   return (
     <ScrollView
@@ -76,7 +92,11 @@ export default function SavedScreen() {
       contentContainerStyle={styles.content}
       showsVerticalScrollIndicator={false}
     >
-      <Text style={styles.title}>Saved</Text>
+      <View style={styles.titleRow}>
+        <Text style={styles.title}>Saved</Text>
+        {loading ? <ActivityIndicator color="#9A4600" /> : null}
+      </View>
+
       <Text style={styles.subtitle}>
         Your calm collection of beans, cafés, and roasters worth returning to.
       </Text>
@@ -105,16 +125,25 @@ export default function SavedScreen() {
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryEyebrow}>Collection</Text>
-        <Text style={styles.summaryTitle}>Near you now</Text>
+        <Text style={styles.summaryTitle}>Saved for later</Text>
         <Text style={styles.summaryText}>
-          A few saved favorites already have nearby availability.
+          Your saved places and coffees now come from the live backend.
         </Text>
         <Text style={styles.summaryMeta}>{countText}</Text>
       </View>
 
+      {isEmpty ? (
+        <View style={styles.emptyCard}>
+          <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+          <Text style={styles.emptyText}>
+            Save a bean, café, or roaster and it will appear here.
+          </Text>
+        </View>
+      ) : null}
+
       {activeTab === "Beans" && (
         <View style={styles.stack}>
-          {SAVED_BEANS.map((bean) => (
+          {saved.beans.map((bean) => (
             <Pressable
               key={bean.id}
               style={styles.card}
@@ -143,7 +172,7 @@ export default function SavedScreen() {
 
       {activeTab === "Cafés" && (
         <View style={styles.stack}>
-          {SAVED_CAFES.map((cafe) => (
+          {saved.cafes.map((cafe) => (
             <Pressable
               key={cafe.id}
               style={styles.card}
@@ -169,7 +198,7 @@ export default function SavedScreen() {
 
       {activeTab === "Roasters" && (
         <View style={styles.stack}>
-          {SAVED_ROASTERS.map((roaster) => (
+          {saved.roasters.map((roaster) => (
             <Pressable
               key={roaster.id}
               style={styles.card}
@@ -190,6 +219,11 @@ export default function SavedScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: "#FCF9F4" },
   content: { paddingHorizontal: 24, paddingTop: 64, paddingBottom: 32 },
+  titleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   title: {
     fontSize: 38,
     lineHeight: 42,
@@ -243,6 +277,24 @@ const styles = StyleSheet.create({
   },
   summaryText: { color: "#554339", fontSize: 15, lineHeight: 22, marginBottom: 10 },
   summaryMeta: { color: "#9A4600", fontSize: 14, fontWeight: "700" },
+  emptyCard: {
+    backgroundColor: "#F1ECE5",
+    borderRadius: 28,
+    padding: 22,
+    marginBottom: 18,
+  },
+  emptyTitle: {
+    fontSize: 24,
+    lineHeight: 28,
+    color: "#1C1C19",
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  emptyText: {
+    color: "#554339",
+    fontSize: 15,
+    lineHeight: 22,
+  },
   stack: { gap: 16 },
   card: {
     backgroundColor: "#F1ECE5",
