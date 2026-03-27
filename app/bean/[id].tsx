@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,19 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+
 import { mockBeans } from "../../lib/mock-data";
 import { getBeanBySlug, getAvailabilityByBeanId } from "../../lib/catalog";
-import { Alert } from "react-native";
-import { saveEntity, followEntity } from "../../lib/user-actions";
+import {
+  isEntitySaved,
+  isEntityFollowed,
+  toggleSaveEntity,
+  toggleFollowEntity,
+} from "../../lib/user-actions";
 
 type LiveBean = {
   id: string;
@@ -68,6 +75,11 @@ export default function BeanDetailScreen() {
   const [liveAvailability, setLiveAvailability] = useState<LiveAvailability[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const [isSaved, setIsSaved] = useState(false);
+  const [isSaveLoading, setIsSaveLoading] = useState(false);
+  const [isRoasterFollowed, setIsRoasterFollowed] = useState(false);
+  const [isRoasterFollowLoading, setIsRoasterFollowLoading] = useState(false);
+
   useEffect(() => {
     let mounted = true;
 
@@ -84,6 +96,9 @@ export default function BeanDetailScreen() {
           const availability = await getAvailabilityByBeanId(bean.id);
           if (!mounted) return;
           setLiveAvailability(availability);
+        } else {
+          setLiveBean(null);
+          setLiveAvailability([]);
         }
       } catch (err) {
         console.error("Failed to load bean", err);
@@ -136,6 +151,64 @@ export default function BeanDetailScreen() {
     return fallback.cafes;
   }, [liveAvailability, fallback.cafes]);
 
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function loadActionState() {
+        try {
+          const [saved, followed] = await Promise.all([
+            isEntitySaved("bean", slug),
+            isEntityFollowed("roaster", beanRoasterSlug),
+          ]);
+
+          if (!active) return;
+
+          setIsSaved(saved);
+          setIsRoasterFollowed(followed);
+        } catch (error) {
+          console.error("Failed to load bean action state", error);
+        }
+      }
+
+      void loadActionState();
+
+      return () => {
+        active = false;
+      };
+    }, [slug, beanRoasterSlug])
+  );
+
+  async function handleToggleSave() {
+    if (isSaveLoading) return;
+
+    try {
+      setIsSaveLoading(true);
+      const nextState = await toggleSaveEntity("bean", slug);
+      setIsSaved(nextState);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not update save state");
+    } finally {
+      setIsSaveLoading(false);
+    }
+  }
+
+  async function handleToggleRoasterFollow() {
+    if (!beanRoasterSlug || isRoasterFollowLoading) return;
+
+    try {
+      setIsRoasterFollowLoading(true);
+      const nextState = await toggleFollowEntity("roaster", beanRoasterSlug);
+      setIsRoasterFollowed(nextState);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not update follow state");
+    } finally {
+      setIsRoasterFollowLoading(false);
+    }
+  }
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -180,39 +253,46 @@ export default function BeanDetailScreen() {
 
           <View style={styles.actionRow}>
             <Pressable
-              style={styles.primaryButton}
-              onPress={async () => {
-                try {
-                  await saveEntity("bean", slug);
-                  Alert.alert("Saved", "Bean saved to your collection.");
-                } catch (error) {
-                  console.error(error);
-                  Alert.alert("Could not save bean");
-                }
-              }}
+              style={[
+                styles.primaryButton,
+                isSaved && styles.primaryButtonActive,
+                isSaveLoading && styles.buttonDisabled,
+              ]}
+              onPress={handleToggleSave}
+              disabled={isSaveLoading}
             >
-              <Text style={styles.primaryButtonText}>Save Bean</Text>
+              <Text style={styles.primaryButtonText}>
+                {isSaveLoading ? "Updating…" : isSaved ? "Saved" : "Save Bean"}
+              </Text>
             </Pressable>
 
             <Pressable
-              style={styles.secondaryButton}
-              onPress={async () => {
-                try {
-                  await followEntity("roaster", beanRoasterSlug);
-                  Alert.alert("Following", "Roaster added to your follows.");
-                } catch (error) {
-                  console.error(error);
-                  Alert.alert("Could not follow roaster");
-                }
-              }}
+              style={[
+                styles.secondaryButton,
+                isRoasterFollowed && styles.secondaryButtonActive,
+                isRoasterFollowLoading && styles.buttonDisabled,
+              ]}
+              onPress={handleToggleRoasterFollow}
+              disabled={isRoasterFollowLoading}
             >
-              <Text style={styles.secondaryButtonText}>Follow Roaster</Text>
+              <Text
+                style={[
+                  styles.secondaryButtonText,
+                  isRoasterFollowed && styles.secondaryButtonTextActive,
+                ]}
+              >
+                {isRoasterFollowLoading
+                  ? "Updating…"
+                  : isRoasterFollowed
+                    ? "Following"
+                    : "Follow Roaster"}
+              </Text>
             </Pressable>
           </View>
         </View>
 
         <View style={styles.sectionHeaderSimple}>
-          <Text style={styles.sectionTitle}>Flavor Notes</Text>
+          <Text style={styles.sectionTitleInline}>Flavor Notes</Text>
           {loading ? <ActivityIndicator color="#9A4600" /> : null}
         </View>
 
@@ -241,7 +321,7 @@ export default function BeanDetailScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Where to drink this nearby</Text>
+          <Text style={styles.sectionTitleInline}>Where to drink this nearby</Text>
           <Text style={styles.sectionLink}>See map</Text>
         </View>
 
@@ -387,6 +467,9 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     alignItems: "center",
   },
+  primaryButtonActive: {
+    backgroundColor: "#6F7D57",
+  },
   primaryButtonText: {
     color: "#FFFFFF",
     fontSize: 16,
@@ -401,10 +484,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#FCF9F4",
   },
+  secondaryButtonActive: {
+    backgroundColor: "#EEE6DB",
+    borderColor: "#6F7D57",
+  },
   secondaryButtonText: {
     color: "#9A4600",
     fontSize: 16,
     fontWeight: "700",
+  },
+  secondaryButtonTextActive: {
+    color: "#4E5C3D",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
   },
   sectionHeaderSimple: {
     flexDirection: "row",
@@ -422,6 +515,12 @@ const styles = StyleSheet.create({
     marginTop: 26,
     marginBottom: 14,
     paddingHorizontal: 24,
+  },
+  sectionTitleInline: {
+    fontSize: 28,
+    lineHeight: 32,
+    color: "#1C1C19",
+    fontWeight: "700",
   },
   notesWrap: {
     flexDirection: "row",

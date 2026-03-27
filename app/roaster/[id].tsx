@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,20 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
+import { useFocusEffect } from "@react-navigation/native";
+
 import { mockRoasters } from "../../lib/mock-data";
 import { getRoasterBySlug, getBeansByRoasterId } from "../../lib/catalog";
-import { Alert } from "react-native";
-import { followEntity } from "../../lib/user-actions";
+import {
+  isEntitySaved,
+  isEntityFollowed,
+  toggleSaveEntity,
+  toggleFollowEntity,
+} from "../../lib/user-actions";
+
 type LiveRoaster = {
   id: string;
   slug: string;
@@ -34,6 +42,11 @@ export default function RoasterDetailScreen() {
   const slug = id ?? "dark-arts-coffee";
 
   const fallback = mockRoasters[slug] ?? mockRoasters["dark-arts-coffee"];
+
+  const [isSaved, setIsSaved] = useState(false);
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [isSaveLoading, setIsSaveLoading] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
 
   const [liveRoaster, setLiveRoaster] = useState<LiveRoaster | null>(null);
   const [liveBeans, setLiveBeans] = useState<LiveBean[]>([]);
@@ -56,6 +69,9 @@ export default function RoasterDetailScreen() {
           const beans = await getBeansByRoasterId(roaster.id);
           if (!mounted) return;
           setLiveBeans(beans);
+        } else {
+          setLiveRoaster(null);
+          setLiveBeans([]);
         }
       } catch (err) {
         console.error("Failed to load roaster", err);
@@ -70,6 +86,64 @@ export default function RoasterDetailScreen() {
       mounted = false;
     };
   }, [slug]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+
+      async function loadActionState() {
+        try {
+          const [saved, followed] = await Promise.all([
+            isEntitySaved("roaster", slug),
+            isEntityFollowed("roaster", slug),
+          ]);
+
+          if (!active) return;
+
+          setIsSaved(saved);
+          setIsFollowed(followed);
+        } catch (error) {
+          console.error("Failed to load roaster action state", error);
+        }
+      }
+
+      void loadActionState();
+
+      return () => {
+        active = false;
+      };
+    }, [slug])
+  );
+
+  async function handleToggleSave() {
+    if (isSaveLoading) return;
+
+    try {
+      setIsSaveLoading(true);
+      const nextState = await toggleSaveEntity("roaster", slug);
+      setIsSaved(nextState);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not update save state");
+    } finally {
+      setIsSaveLoading(false);
+    }
+  }
+
+  async function handleToggleFollow() {
+    if (isFollowLoading) return;
+
+    try {
+      setIsFollowLoading(true);
+      const nextState = await toggleFollowEntity("roaster", slug);
+      setIsFollowed(nextState);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not update follow state");
+    } finally {
+      setIsFollowLoading(false);
+    }
+  }
 
   const title = liveRoaster?.name ?? fallback.name;
   const description = liveRoaster?.description ?? fallback.description;
@@ -115,20 +189,40 @@ export default function RoasterDetailScreen() {
             <Text style={styles.flavorText}>{flavorDirection}</Text>
           </View>
 
-          <Pressable
-            style={styles.followButton}
-            onPress={async () => {
-              try {
-                await followEntity("roaster", slug);
-                Alert.alert("Following", "Roaster added to your follows.");
-              } catch (error) {
-                console.error(error);
-                Alert.alert("Could not follow roaster");
-              }
-            }}
-          >
-            <Text style={styles.followButtonText}>Follow Roaster</Text>
-          </Pressable>
+          <View style={styles.actionRow}>
+            <Pressable
+              style={[
+                styles.primaryButton,
+                isSaved && styles.primaryButtonActive,
+                isSaveLoading && styles.buttonDisabled,
+              ]}
+              onPress={handleToggleSave}
+              disabled={isSaveLoading}
+            >
+              <Text style={styles.primaryButtonText}>
+                {isSaveLoading ? "Updating…" : isSaved ? "Saved" : "Save"}
+              </Text>
+            </Pressable>
+
+            <Pressable
+              style={[
+                styles.secondaryButton,
+                isFollowed && styles.secondaryButtonActive,
+                isFollowLoading && styles.buttonDisabled,
+              ]}
+              onPress={handleToggleFollow}
+              disabled={isFollowLoading}
+            >
+              <Text
+                style={[
+                  styles.secondaryButtonText,
+                  isFollowed && styles.secondaryButtonTextActive,
+                ]}
+              >
+                {isFollowLoading ? "Updating…" : isFollowed ? "Following" : "Follow"}
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
         <View style={styles.sectionHeader}>
@@ -253,13 +347,50 @@ const styles = StyleSheet.create({
     textTransform: "uppercase",
   },
   flavorText: { color: "#7D3400", fontSize: 15, fontWeight: "600" },
-  followButton: {
+  actionRow: {
+    flexDirection: "row",
+    gap: 12,
+    marginTop: 4,
+  },
+  primaryButton: {
+    flex: 1,
     backgroundColor: "#9A4600",
     paddingVertical: 16,
     borderRadius: 999,
     alignItems: "center",
   },
-  followButtonText: { color: "#FFFFFF", fontSize: 16, fontWeight: "700" },
+  primaryButtonActive: {
+    backgroundColor: "#6F7D57",
+  },
+  primaryButtonText: {
+    color: "#FFFFFF",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  secondaryButton: {
+    flex: 1,
+    borderWidth: 1.5,
+    borderColor: "#9A4600",
+    paddingVertical: 16,
+    borderRadius: 999,
+    alignItems: "center",
+    backgroundColor: "#FCF9F4",
+  },
+  secondaryButtonActive: {
+    backgroundColor: "#EEE6DB",
+    borderColor: "#6F7D57",
+  },
+  secondaryButtonText: {
+    color: "#9A4600",
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  secondaryButtonTextActive: {
+    color: "#4E5C3D",
+  },
+  buttonDisabled: {
+    opacity: 0.7,
+  },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",

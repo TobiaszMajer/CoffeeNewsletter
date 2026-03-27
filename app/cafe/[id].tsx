@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,12 +8,18 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
+  Alert,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 import { mockCafes } from "../../lib/mock-data";
-import { getCafeBySlug, getCafeBeans } from "../../lib/catalog";
-import { Alert } from "react-native";
-import { saveEntity, followEntity } from "../../lib/user-actions";
+import { getCafeBySlug, getCafeBeans } from "../../lib/catalog"; 
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  isEntitySaved,
+  isEntityFollowed,
+  toggleSaveEntity,
+  toggleFollowEntity,
+} from "../../lib/user-actions";
 
 type LiveCafe = {
   id: string;
@@ -80,41 +86,71 @@ export default function CafeDetailScreen() {
   const slug = id ?? "rosslyn-coffee";
 
   const fallback = mockCafes[slug] ?? mockCafes["rosslyn-coffee"];
-
+  const [isSaved, setIsSaved] = useState(false);
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [isSaveLoading, setIsSaveLoading] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const [liveCafe, setLiveCafe] = useState<LiveCafe | null>(null);
   const [liveBeans, setLiveBeans] = useState<LiveCafeBean[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
+useFocusEffect(
+  useCallback(() => {
+    let active = true;
 
-    async function load() {
+    async function loadActionState() {
       try {
-        setLoading(true);
+        const [saved, followed] = await Promise.all([
+          isEntitySaved("cafe", slug),
+          isEntityFollowed("cafe", slug),
+        ]);
 
-        const cafe = await getCafeBySlug(slug);
-        if (!mounted) return;
+        if (!active) return;
 
-        if (cafe) {
-          setLiveCafe(cafe);
-
-          const beans = await getCafeBeans(cafe.id);
-          if (!mounted) return;
-          setLiveBeans(beans as LiveCafeBean[]);
-        }
-      } catch (err) {
-        console.error("Failed to load cafe", err);
-      } finally {
-        if (mounted) setLoading(false);
+        setIsSaved(saved);
+        setIsFollowed(followed);
+      } catch (error) {
+        console.error("Failed to load cafe action state", error);
       }
     }
 
-    load();
+    void loadActionState();
 
     return () => {
-      mounted = false;
+      active = false;
     };
-  }, [slug]);
+  }, [slug])
+);
+
+async function handleToggleSave() {
+  if (isSaveLoading) return;
+
+  try {
+    setIsSaveLoading(true);
+    const nextState = await toggleSaveEntity("cafe", slug);
+    setIsSaved(nextState);
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Could not update save state");
+  } finally {
+    setIsSaveLoading(false);
+  }
+}
+
+async function handleToggleFollow() {
+  if (isFollowLoading) return;
+
+  try {
+    setIsFollowLoading(true);
+    const nextState = await toggleFollowEntity("cafe", slug);
+    setIsFollowed(nextState);
+  } catch (error) {
+    console.error(error);
+    Alert.alert("Could not update follow state");
+  } finally {
+    setIsFollowLoading(false);
+  }
+}
 
   const title = liveCafe?.name ?? fallback.name;
   const area = liveCafe?.neighborhood ?? fallback.area;
@@ -180,31 +216,42 @@ export default function CafeDetailScreen() {
             </View>
 
             <View style={styles.saveWrap}>
-              <Pressable style={styles.iconButton}
-                onPress={async () => {
-                  try {
-                    await saveEntity("cafe", slug);
-                    Alert.alert("Saved", "Café saved to your collection.");
-                  } catch (error) {
-                    console.error(error);
-                    Alert.alert("Could not save café");
-                  }
-                }}
+              <Pressable
+                style={[
+                  styles.iconButton,
+                  isSaved && styles.iconButtonActive,
+                  isSaveLoading && styles.iconButtonDisabled,
+                ]}
+                onPress={handleToggleSave}
+                disabled={isSaveLoading}
               >
-                <Text style={styles.iconButtonText}>⌑</Text>
+                <Text
+                  style={[
+                    styles.iconButtonText,
+                    isSaved && styles.iconButtonTextActive,
+                  ]}
+                >
+                  {isSaveLoading ? "…" : isSaved ? "✓" : "⌑"}
+                </Text>
               </Pressable>
-              <Pressable style={styles.iconButton}
-                onPress={async () => {
-                  try {
-                    await followEntity("cafe", slug);
-                    Alert.alert("Following", "Café added to your follows.");
-                  } catch (error) {
-                    console.error(error);
-                    Alert.alert("Could not follow café");
-                  }
-                }}
+
+              <Pressable
+                style={[
+                  styles.iconButton,
+                  isFollowed && styles.iconButtonActive,
+                  isFollowLoading && styles.iconButtonDisabled,
+                ]}
+                onPress={handleToggleFollow}
+                disabled={isFollowLoading}
               >
-                <Text style={styles.iconButtonText}>＋</Text>
+                <Text
+                  style={[
+                    styles.iconButtonText,
+                    isFollowed && styles.iconButtonTextActive,
+                  ]}
+                >
+                  {isFollowLoading ? "…" : isFollowed ? "✓" : "＋"}
+                </Text>
               </Pressable>
             </View>
           </View>
@@ -370,6 +417,17 @@ const styles = StyleSheet.create({
     backgroundColor: "#FCF9F4",
     alignItems: "center",
     justifyContent: "center",
+  },
+    iconButtonActive: {
+    backgroundColor: "#E4EBDD",
+    borderWidth: 1.5,
+    borderColor: "#6F7D57",
+  },
+  iconButtonTextActive: {
+    color: "#4E5C3D",
+  },
+  iconButtonDisabled: {
+    opacity: 0.7,
   },
   iconButtonText: {
     color: "#9A4600",
