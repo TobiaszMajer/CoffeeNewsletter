@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -16,32 +16,56 @@ type ProfileSummary = {
   identityText: string;
   identityTags: string[];
   counts: {
-    savedBeans: number;
-    savedCafes: number;
-    savedRoasters: number;
+    favoriteBeans: number;
+    favoriteCafes: number;
+    favoriteRoasters: number;
+    tastings: number;
   };
-  following: {
-    cafes: { id: string; name: string; subtitle: string }[];
-    roasters: { id: string; name: string; subtitle: string }[];
-  };
+  recentReactions: {
+    id: string;
+    beanSlug: string;
+    beanName: string;
+    venueName: string | null;
+    reaction: "loved_it" | "liked_it" | "not_for_me";
+    createdAt: string;
+  }[];
 };
+
+function formatReactionLabel(reaction: ProfileSummary["recentReactions"][number]["reaction"]) {
+  if (reaction === "loved_it") return "Loved it";
+  if (reaction === "liked_it") return "Liked it";
+  return "Not for me";
+}
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  const dayDiff = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+  if (dayDiff <= 0) return "Today";
+  if (dayDiff === 1) return "Yesterday";
+  if (dayDiff < 7) return `${dayDiff} days ago`;
+
+  return date.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+  });
+}
 
 export default function ProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [profile, setProfile] = useState<ProfileSummary>({
     identityTitle: "Guest profile",
     identityText:
-      "You are using a guest profile. Saved coffees and follows will shape this account over time.",
+      "You are using a guest profile. Favorites and tastings will gradually shape this account.",
     identityTags: [],
     counts: {
-      savedBeans: 0,
-      savedCafes: 0,
-      savedRoasters: 0,
+      favoriteBeans: 0,
+      favoriteCafes: 0,
+      favoriteRoasters: 0,
+      tastings: 0,
     },
-    following: {
-      cafes: [],
-      roasters: [],
-    },
+    recentReactions: [],
   });
 
   useFocusEffect(
@@ -65,7 +89,7 @@ export default function ProfileScreen() {
         }
       }
 
-      load();
+      void load();
 
       return () => {
         isActive = false;
@@ -73,16 +97,22 @@ export default function ProfileScreen() {
     }, [])
   );
 
-  const followingItems = [
-    ...profile.following.cafes.map((item) => ({
-      ...item,
-      type: "cafe" as const,
-    })),
-    ...profile.following.roasters.map((item) => ({
-      ...item,
-      type: "roaster" as const,
-    })),
-  ];
+  const summaryText = useMemo(() => {
+    const totalFavorites =
+      profile.counts.favoriteBeans +
+      profile.counts.favoriteCafes +
+      profile.counts.favoriteRoasters;
+
+    if (totalFavorites === 0 && profile.counts.tastings === 0) {
+      return "Start favoriting coffees or reacting to tastings and your profile will begin to take shape.";
+    }
+
+    return `${totalFavorites} favorite${
+      totalFavorites === 1 ? "" : "s"
+    } • ${profile.counts.tastings} tasting${
+      profile.counts.tastings === 1 ? "" : "s"
+    }`;
+  }, [profile]);
 
   return (
     <ScrollView
@@ -96,7 +126,7 @@ export default function ProfileScreen() {
       </View>
 
       <Text style={styles.subtitle}>
-        Your taste identity, saved collections, and the places you follow.
+        Your taste identity, favorites, and tasting memory.
       </Text>
 
       <View style={styles.identityCard}>
@@ -119,47 +149,67 @@ export default function ProfileScreen() {
         </View>
       </View>
 
-      <View style={styles.countsRow}>
+      <View style={styles.summaryCard}>
+        <Text style={styles.summaryEyebrow}>Snapshot</Text>
+        <Text style={styles.summaryTitle}>Your profile at a glance</Text>
+        <Text style={styles.summaryText}>{summaryText}</Text>
+      </View>
+
+      <View style={styles.countsGrid}>
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>{profile.counts.savedBeans}</Text>
-          <Text style={styles.countLabel}>Saved beans</Text>
+          <Text style={styles.countValue}>{profile.counts.favoriteBeans}</Text>
+          <Text style={styles.countLabel}>Favorite beans</Text>
         </View>
+
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>{profile.counts.savedCafes}</Text>
-          <Text style={styles.countLabel}>Saved cafés</Text>
+          <Text style={styles.countValue}>{profile.counts.favoriteCafes}</Text>
+          <Text style={styles.countLabel}>Favorite cafés</Text>
         </View>
+
         <View style={styles.countCard}>
-          <Text style={styles.countValue}>{profile.counts.savedRoasters}</Text>
-          <Text style={styles.countLabel}>Roasters</Text>
+          <Text style={styles.countValue}>{profile.counts.favoriteRoasters}</Text>
+          <Text style={styles.countLabel}>Favorite roasters</Text>
+        </View>
+
+        <View style={styles.countCard}>
+          <Text style={styles.countValue}>{profile.counts.tastings}</Text>
+          <Text style={styles.countLabel}>Tastings</Text>
         </View>
       </View>
 
-      <Text style={styles.sectionTitle}>Following</Text>
+      <Text style={styles.sectionTitle}>Recent tastings</Text>
 
-      {followingItems.length === 0 ? (
+      {profile.recentReactions.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Nothing followed yet</Text>
+          <Text style={styles.emptyTitle}>No tastings yet</Text>
           <Text style={styles.emptyText}>
-            Follow a café or roaster and it will appear here.
+            React to a coffee and your recent tasting memory will appear here.
           </Text>
         </View>
       ) : (
-        followingItems.map((item) => (
+        profile.recentReactions.map((item) => (
           <Pressable
-            key={`${item.type}-${item.id}`}
-            style={styles.followCard}
-            onPress={() =>
-              router.push(
-                item.type === "cafe" ? `/cafe/${item.id}` : `/roaster/${item.id}`
-              )
-            }
+            key={item.id}
+            style={styles.reactionCard}
+            onPress={() => router.push(`/bean/${item.beanSlug}`)}
           >
-            <View
-              style={item.type === "cafe" ? styles.followImageSoft : styles.followImageDark}
-            />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.followTitle}>{item.name}</Text>
-              <Text style={styles.followSubtitle}>{item.subtitle}</Text>
+            <View style={styles.reactionTopRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.reactionTitle}>{item.beanName}</Text>
+                <Text style={styles.reactionSubtitle}>
+                  {item.venueName ?? "Coffee memory"}
+                </Text>
+              </View>
+
+              <Text style={styles.reactionDate}>
+                {formatRelativeDate(item.createdAt)}
+              </Text>
+            </View>
+
+            <View style={styles.reactionPill}>
+              <Text style={styles.reactionPillText}>
+                {formatReactionLabel(item.reaction)}
+              </Text>
             </View>
           </Pressable>
         ))
@@ -234,24 +284,68 @@ const styles = StyleSheet.create({
     lineHeight: 22,
     marginBottom: 14,
   },
-  tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  tagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
   tag: {
     backgroundColor: "#FCF9F4",
     paddingHorizontal: 10,
     paddingVertical: 7,
     borderRadius: 999,
   },
-  tagText: { color: "#554339", fontSize: 12, fontWeight: "600" },
-  countsRow: { flexDirection: "row", gap: 12, marginBottom: 22 },
+  tagText: {
+    color: "#554339",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  summaryCard: {
+    backgroundColor: "#F1ECE5",
+    borderRadius: 28,
+    padding: 20,
+    marginBottom: 18,
+  },
+  summaryEyebrow: {
+    color: "#7A675C",
+    fontSize: 12,
+    fontWeight: "700",
+    letterSpacing: 1.2,
+    textTransform: "uppercase",
+    marginBottom: 8,
+  },
+  summaryTitle: {
+    fontSize: 26,
+    lineHeight: 30,
+    color: "#1C1C19",
+    fontWeight: "700",
+    marginBottom: 8,
+  },
+  summaryText: {
+    color: "#554339",
+    fontSize: 15,
+    lineHeight: 22,
+  },
+  countsGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 12,
+    marginBottom: 22,
+  },
   countCard: {
-    flex: 1,
+    width: "48.2%",
     backgroundColor: "#F1ECE5",
     borderRadius: 22,
     paddingVertical: 18,
     paddingHorizontal: 12,
     alignItems: "center",
   },
-  countValue: { color: "#1C1C19", fontSize: 26, fontWeight: "700", marginBottom: 4 },
+  countValue: {
+    color: "#1C1C19",
+    fontSize: 26,
+    fontWeight: "700",
+    marginBottom: 4,
+  },
   countLabel: {
     color: "#554339",
     fontSize: 12,
@@ -283,34 +377,45 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  followCard: {
+  reactionCard: {
     backgroundColor: "#F1ECE5",
     borderRadius: 24,
-    padding: 14,
-    flexDirection: "row",
-    gap: 14,
+    padding: 16,
     marginBottom: 12,
-    alignItems: "center",
+    gap: 12,
   },
-  followImageSoft: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: "#B89D88",
+  reactionTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 12,
   },
-  followImageDark: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
-    backgroundColor: "#7B5B47",
-  },
-  followTitle: {
+  reactionTitle: {
     fontSize: 20,
     color: "#1C1C19",
     fontWeight: "700",
     marginBottom: 4,
   },
-  followSubtitle: { color: "#554339", fontSize: 14 },
+  reactionSubtitle: {
+    color: "#554339",
+    fontSize: 14,
+  },
+  reactionDate: {
+    color: "#7A675C",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  reactionPill: {
+    alignSelf: "flex-start",
+    backgroundColor: "#E4EBDD",
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  reactionPillText: {
+    color: "#4C5A49",
+    fontSize: 12,
+    fontWeight: "700",
+  },
   settingsCard: {
     backgroundColor: "#F1ECE5",
     borderRadius: 24,
@@ -323,6 +428,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     paddingVertical: 18,
   },
-  settingText: { color: "#1C1C19", fontSize: 16, fontWeight: "600" },
-  settingArrow: { color: "#7A675C", fontSize: 24, lineHeight: 24 },
+  settingText: {
+    color: "#1C1C19",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  settingArrow: {
+    color: "#7A675C",
+    fontSize: 24,
+    lineHeight: 24,
+  },
 });

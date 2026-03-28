@@ -1,12 +1,40 @@
 import { supabase } from "./supabase";
 import { ensureProfile } from "./auth";
  
+type ProfileReactionRow = {
+  id: string;
+  reaction: "loved_it" | "liked_it" | "not_for_me";
+  created_at: string;
+  beans:
+    | {
+        slug: string;
+        name: string;
+      }
+    | {
+        slug: string;
+        name: string;
+      }[]
+    | null;
+  cafes:
+    | {
+        slug: string;
+        name: string;
+      }
+    | {
+        slug: string;
+        name: string;
+      }[]
+    | null;
+};
+
 export async function getProfileSummary() {
   const userId = await ensureProfile();
 
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("flavor_preferences, roast_preference, drink_style, discovery_style")
+    .select(
+      "flavor_preferences, roast_preference, drink_style, discovery_style"
+    )
     .eq("id", userId)
     .maybeSingle();
 
@@ -19,64 +47,34 @@ export async function getProfileSummary() {
 
   if (savesError) throw savesError;
 
-  const { data: follows, error: followsError } = await supabase
-    .from("follows")
-    .select("entity_type, entity_slug")
-    .eq("user_id", userId);
+  const { data: reactions, error: reactionsError } = await supabase
+    .from("reactions")
+    .select(
+      `
+      id,
+      reaction,
+      created_at,
+      beans (
+        slug,
+        name
+      ),
+      cafes (
+        slug,
+        name
+      )
+    `
+    )
+    .eq("user_id", userId)
+    .order("created_at", { ascending: false });
 
-  if (followsError) throw followsError;
+  if (reactionsError) throw reactionsError;
 
-  const savedBeansCount =
+  const favoriteBeansCount =
     saves?.filter((row) => row.entity_type === "bean").length ?? 0;
-  const savedCafesCount =
+  const favoriteCafesCount =
     saves?.filter((row) => row.entity_type === "cafe").length ?? 0;
-  const savedRoastersCount =
+  const favoriteRoastersCount =
     saves?.filter((row) => row.entity_type === "roaster").length ?? 0;
-
-  const followedCafeSlugs =
-    follows
-      ?.filter((row) => row.entity_type === "cafe")
-      .map((row) => row.entity_slug) ?? [];
-
-  const followedRoasterSlugs =
-    follows
-      ?.filter((row) => row.entity_type === "roaster")
-      .map((row) => row.entity_slug) ?? [];
-
-  let followedCafes: { id: string; name: string; subtitle: string }[] = [];
-  let followedRoasters: { id: string; name: string; subtitle: string }[] = [];
-
-  if (followedCafeSlugs.length > 0) {
-    const { data, error } = await supabase
-      .from("cafes")
-      .select("slug, name, neighborhood")
-      .in("slug", followedCafeSlugs);
-
-    if (error) throw error;
-
-    followedCafes =
-      data?.map((row) => ({
-        id: row.slug,
-        name: row.name,
-        subtitle: `${row.neighborhood ?? "Area"} • Café`,
-      })) ?? [];
-  }
-
-  if (followedRoasterSlugs.length > 0) {
-    const { data, error } = await supabase
-      .from("roasters")
-      .select("slug, name, flavor_direction")
-      .in("slug", followedRoasterSlugs);
-
-    if (error) throw error;
-
-    followedRoasters =
-      data?.map((row) => ({
-        id: row.slug,
-        name: row.name,
-        subtitle: `Roaster • ${row.flavor_direction ?? "Distinct flavor direction"}`,
-      })) ?? [];
-  }
 
   const flavorPreferences = profile?.flavor_preferences ?? [];
   const roastPreference = profile?.roast_preference ?? null;
@@ -90,23 +88,47 @@ export async function getProfileSummary() {
     discoveryStyle,
   ].filter(Boolean) as string[];
 
+  const recentReactions = ((reactions ?? []) as ProfileReactionRow[])
+    .map((row) => {
+      const bean = firstRelation(row.beans);
+      const cafe = firstRelation(row.cafes);
+
+      if (!bean?.slug) return null;
+
+      return {
+        id: row.id,
+        beanSlug: bean.slug,
+        beanName: bean.name,
+        venueName: cafe?.name ?? null,
+        reaction: row.reaction,
+        createdAt: row.created_at,
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 4) as {
+    id: string;
+    beanSlug: string;
+    beanName: string;
+    venueName: string | null;
+    reaction: "loved_it" | "liked_it" | "not_for_me";
+    createdAt: string;
+  }[];
+
   return {
     identityTitle:
-      identityTags.length > 0 ? "Your current profile" : "Guest profile",
+      identityTags.length > 0 ? "Your taste profile" : "Guest profile",
     identityText:
       identityTags.length > 0
-        ? "Your onboarding choices are now shaping the way the app will recommend coffee."
-        : "You are using a guest profile. Saved coffees and follows will shape this account over time.",
+        ? "Your onboarding choices are now shaping discovery, and your tastings will keep refining this profile over time."
+        : "You are using a guest profile. Favorites and tastings will gradually shape this account.",
     identityTags,
     counts: {
-      savedBeans: savedBeansCount,
-      savedCafes: savedCafesCount,
-      savedRoasters: savedRoastersCount,
+      favoriteBeans: favoriteBeansCount,
+      favoriteCafes: favoriteCafesCount,
+      favoriteRoasters: favoriteRoastersCount,
+      tastings: reactions?.length ?? 0,
     },
-    following: {
-      cafes: followedCafes,
-      roasters: followedRoasters,
-    },
+    recentReactions,
   };
 }
 
