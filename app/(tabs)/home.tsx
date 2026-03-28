@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { router } from "expo-router";
 import { getHomeBeans } from "../../lib/catalog";
+import { colors, radius, shadows, spacing, typography } from "../theme";
 
 type LiveHomeBean = {
   id: string;
@@ -91,7 +92,7 @@ export default function HomeScreen() {
       }
     }
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
@@ -129,23 +130,31 @@ export default function HomeScreen() {
     >
       <View style={styles.topRow}>
         <Text style={styles.brand}>Oat & Ember</Text>
-        {loading ? <ActivityIndicator color="#9A4600" /> : null}
+        {loading ? <ActivityIndicator color={colors.accentPrimary} /> : null}
       </View>
 
-      <Text style={styles.title}>Good evening.</Text>
-      <Text style={styles.subtitle}>
-        Ready to discover beans that fit your taste?
-      </Text>
+      <View style={styles.introBlock}>
+        <Text style={styles.eyebrow}>Today’s discovery</Text>
+        <Text style={styles.title}>Good evening.</Text>
+        <Text style={styles.subtitle}>
+          A calmer way to find beans that fit your taste, nearby right now.
+        </Text>
+      </View>
 
-      <Pressable
+      {/* <Pressable
         style={styles.searchBox}
         onPress={() => router.push("/(tabs)/explore")}
       >
         <Text style={styles.searchText}>Search beans, roasters, or cafés...</Text>
-      </Pressable>
+        <Text style={styles.searchHint}>Explore</Text>
+      </Pressable> */}
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Best matches near you</Text>
+        <View style={styles.sectionHeaderText}>
+          <Text style={styles.sectionEyebrow}>For you</Text>
+          <Text style={styles.sectionTitle}>Best matches nearby</Text>
+        </View>
+
         <Pressable onPress={() => router.push("/(tabs)/explore")}>
           <Text style={styles.sectionLink}>See all</Text>
         </Pressable>
@@ -156,26 +165,74 @@ export default function HomeScreen() {
         onPress={() => router.push(`/bean/${heroBean.id}`)}
       >
         <View style={styles.heroImage} />
-        <Text style={styles.cardTitle}>{heroBean.name}</Text>
-        <Text style={styles.cardMeta}>by {heroBean.roaster}</Text>
-        <Text style={styles.cardNotes}>
-          {heroBean.notes.join(" • ")} • {heroBean.type}
-        </Text>
+
+        <View style={styles.heroBody}>
+          <View style={styles.heroMetaRow}>
+            <Text style={styles.heroMeta}>{heroBean.roaster}</Text>
+            <View style={styles.typePill}>
+              <Text style={styles.typePillText}>{heroBean.type}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.heroTitle}>{heroBean.name}</Text>
+
+          <Text style={styles.heroDescription}>
+            Notes of {heroBean.notes.join(", ").toLowerCase()} — available at{" "}
+            {heroBean.venue}.
+          </Text>
+
+          <View style={styles.heroFooter}>
+            <Text style={styles.heroFreshness}>{heroBean.freshness}</Text>
+            <Text style={styles.heroAction}>Open bean</Text>
+          </View>
+        </View>
       </Pressable>
 
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Fresh drops today</Text>
+        <View style={styles.sectionHeaderText}>
+          <Text style={styles.sectionEyebrow}>Freshness</Text>
+          <Text style={styles.sectionTitle}>Fresh drops today</Text>
+        </View>
       </View>
 
       <Pressable
-        style={styles.smallCard}
+        style={styles.featureCard}
         onPress={() => router.push(`/bean/${freshBean.id}`)}
       >
-        <Text style={styles.smallCardTitle}>{freshBean.name}</Text>
-        <Text style={styles.smallCardText}>
-          {freshBean.freshness} at {freshBean.venue}.
-        </Text>
+        <View style={styles.featureTextBlock}>
+          <Text style={styles.featureTitle}>{freshBean.name}</Text>
+          <Text style={styles.featureText}>
+            {freshBean.freshness} at {freshBean.venue}.
+          </Text>
+        </View>
+
+        <View style={styles.featureBadge}>
+          <Text style={styles.featureBadgeText}>{freshBean.type}</Text>
+        </View>
       </Pressable>
+
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionHeaderText}>
+          <Text style={styles.sectionEyebrow}>Taste cue</Text>
+          <Text style={styles.sectionTitle}>What suits you lately</Text>
+        </View>
+      </View>
+
+      <View style={styles.insightCard}>
+        <Text style={styles.insightTitle}>Bright, floral, and clean.</Text>
+        <Text style={styles.insightText}>
+          Your recent profile leans toward lighter, expressive coffees with a
+          softer filter-friendly feel.
+        </Text>
+
+        <View style={styles.insightTags}>
+          {heroBean.notes.map((note) => (
+            <View key={note} style={styles.insightTag}>
+              <Text style={styles.insightTagText}>{note}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
     </ScrollView>
   );
 }
@@ -183,109 +240,196 @@ export default function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#FCF9F4",
+    backgroundColor: colors.canvas,
   },
   content: {
-    paddingHorizontal: 24,
+    paddingHorizontal: spacing.screen,
     paddingTop: 64,
-    paddingBottom: 32,
+    paddingBottom: spacing.section,
   },
   topRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 28,
+    marginBottom: spacing.section,
   },
   brand: {
-    fontSize: 22,
-    fontStyle: "italic",
-    color: "#9A4600",
-    fontWeight: "600",
+    ...typography.brand,
+  },
+  introBlock: {
+    marginBottom: spacing.xxl,
+  },
+  eyebrow: {
+    ...typography.eyebrow,
+    marginBottom: spacing.sm,
   },
   title: {
-    fontSize: 40,
-    lineHeight: 44,
-    color: "#1C1C19",
-    fontWeight: "700",
-    marginBottom: 8,
+    ...typography.display,
+    marginBottom: spacing.sm,
   },
   subtitle: {
-    fontSize: 17,
-    lineHeight: 25,
-    color: "#554339",
-    marginBottom: 24,
+    ...typography.body,
     maxWidth: 320,
   },
   searchBox: {
-    backgroundColor: "#F1ECE5",
-    borderRadius: 20,
-    paddingHorizontal: 18,
-    paddingVertical: 18,
-    marginBottom: 28,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.lg,
+    marginBottom: spacing.section,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   searchText: {
-    color: "#7A675C",
+    color: colors.textTertiary,
     fontSize: 15,
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  searchHint: {
+    color: colors.accentPrimary,
+    fontSize: 14,
+    fontWeight: "700",
   },
   sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 14,
+    alignItems: "flex-end",
+    marginBottom: spacing.lg,
+  },
+  sectionHeaderText: {
+    gap: spacing.xs,
+  },
+  sectionEyebrow: {
+    ...typography.eyebrow,
   },
   sectionTitle: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: "#1C1C19",
-    fontWeight: "700",
+    ...typography.sectionTitle,
   },
   sectionLink: {
-    color: "#9A4600",
+    color: colors.accentPrimary,
     fontSize: 14,
     fontWeight: "600",
   },
   heroCard: {
-    backgroundColor: "#F1ECE5",
-    borderRadius: 28,
-    padding: 16,
-    marginBottom: 30,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xxl,
+    overflow: "hidden",
+    marginBottom: spacing.section,
+    ...shadows.card,
   },
   heroImage: {
-    height: 240,
-    borderRadius: 22,
-    backgroundColor: "#2C211C",
-    marginBottom: 16,
+    height: 300,
+    backgroundColor: colors.heroDark,
   },
-  cardTitle: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: "#1C1C19",
+  heroBody: {
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  heroMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  heroMeta: {
+    ...typography.meta,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  typePill: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  typePillText: {
+    ...typography.pill,
+    color: colors.successText,
+  },
+  heroTitle: {
+    ...typography.cardTitle,
+  },
+  heroDescription: {
+    ...typography.bodyCompact,
+  },
+  heroFooter: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  heroFreshness: {
+    color: colors.accentPrimary,
+    fontSize: 13,
     fontWeight: "700",
-    marginBottom: 6,
+    flex: 1,
   },
-  cardMeta: {
-    fontSize: 16,
-    color: "#554339",
-    marginBottom: 8,
-  },
-  cardNotes: {
+  heroAction: {
+    color: colors.textTertiary,
     fontSize: 14,
-    color: "#7A675C",
+    fontWeight: "600",
   },
-  smallCard: {
-    backgroundColor: "#F1ECE5",
-    borderRadius: 24,
-    padding: 18,
+  featureCard: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.xl,
+    marginBottom: spacing.section,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.lg,
   },
-  smallCardTitle: {
-    fontSize: 20,
-    color: "#1C1C19",
+  featureTextBlock: {
+    flex: 1,
+    gap: spacing.sm,
+  },
+  featureTitle: {
+    ...typography.cardTitleCompact,
+  },
+  featureText: {
+    ...typography.bodyCompact,
+  },
+  featureBadge: {
+    backgroundColor: colors.accentSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  featureBadgeText: {
+    ...typography.pill,
+    color: colors.accentDeep,
     fontWeight: "700",
-    marginBottom: 8,
   },
-  smallCardText: {
-    fontSize: 15,
-    lineHeight: 22,
-    color: "#554339",
+  insightCard: {
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.xxl,
+    padding: spacing.xl,
+    gap: spacing.md,
+  },
+  insightTitle: {
+    fontSize: 26,
+    lineHeight: 30,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  insightText: {
+    ...typography.bodyCompact,
+  },
+  insightTags: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: spacing.sm,
+  },
+  insightTag: {
+    backgroundColor: colors.canvas,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  insightTagText: {
+    ...typography.pill,
+    color: colors.textSecondary,
   },
 });

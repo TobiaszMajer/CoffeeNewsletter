@@ -24,6 +24,7 @@ import {
   setReactionForBean,
   type BeanReaction,
 } from "../../lib/reactions";
+import { colors, radius, shadows, spacing, typography } from "../theme";
 
 type LiveBean = {
   id: string;
@@ -119,6 +120,8 @@ export default function BeanDetailScreen() {
   }, [slug]);
 
   const liveRoaster = firstRelation(liveBean?.roasters);
+  const primaryAvailability = liveAvailability[0];
+  const primaryCafe = firstRelation(primaryAvailability?.cafes);
 
   const beanTitle = liveBean?.name ?? fallback.name;
   const beanOrigin = liveBean?.origin ?? fallback.origin;
@@ -127,6 +130,19 @@ export default function BeanDetailScreen() {
   const beanRoasterName = liveRoaster?.name ?? fallback.roaster;
   const beanRoasterSlug = liveRoaster?.slug ?? fallback.roasterSlug;
   const beanNotes = liveBean?.flavor_notes ?? fallback.notes;
+  const beanDescription = liveBean?.description ?? fallback.matchText;
+
+  const availabilityChips = useMemo(() => {
+    const firstLiveTypes =
+      liveAvailability.find((item) => (item.availability_types ?? []).length > 0)
+        ?.availability_types ?? [];
+
+    if (firstLiveTypes.length > 0) {
+      return firstLiveTypes.slice(0, 3);
+    }
+
+    return fallback.availability;
+  }, [liveAvailability, fallback.availability]);
 
   const cafes = useMemo(() => {
     if (liveAvailability.length > 0) {
@@ -219,7 +235,7 @@ export default function BeanDetailScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" />
+      <StatusBar barStyle="light-content" />
 
       <ScrollView
         style={styles.screen}
@@ -227,62 +243,77 @@ export default function BeanDetailScreen() {
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
-          <Pressable onPress={() => router.back()} style={styles.backButton}>
-            <Text style={styles.backText}>Back</Text>
-          </Pressable>
-        </View>
+          <View style={styles.heroOverlay} />
 
-        <View style={styles.card}>
-          <View style={styles.topMetaRow}>
-            <Text style={styles.originMeta}>
-              {beanOrigin} • {beanProcess}
-            </Text>
-            <View style={styles.roastChip}>
-              <Text style={styles.roastChipText}>{beanRoast}</Text>
-            </View>
-          </View>
+          <View style={styles.heroTopRow}>
+            <Pressable onPress={() => router.back()} style={styles.heroAction}>
+              <Text style={styles.heroActionText}>Back</Text>
+            </Pressable>
 
-          <Text style={styles.title}>{beanTitle}</Text>
-          <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
-            <Text style={styles.roaster}>Roaster: {beanRoasterName}</Text>
-          </Pressable>
-
-          <View style={styles.matchBox}>
-            <Text style={styles.matchText}>{fallback.matchText}</Text>
-          </View>
-
-          <View style={styles.availabilityRow}>
-            {fallback.availability.map((item) => (
-              <View key={item} style={styles.availabilityChip}>
-                <Text style={styles.availabilityChipText}>{item}</Text>
-              </View>
-            ))}
-          </View>
-
-          <View style={styles.actionRow}>
             <Pressable
               style={[
-                styles.primaryButton,
-                isFavorited && styles.primaryButtonActive,
+                styles.heroAction,
+                isFavorited && styles.heroActionActive,
                 isFavoriteLoading && styles.buttonDisabled,
               ]}
               onPress={handleToggleFavorite}
               disabled={isFavoriteLoading}
             >
-              <Text style={styles.primaryButtonText}>
-                {isFavoriteLoading
-                  ? "Updating…"
-                  : isFavorited
-                    ? "Favorited"
-                    : "Favorite"}
+              <Text style={styles.heroActionText}>
+                {isFavoriteLoading ? "…" : isFavorited ? "♥" : "♡"}
               </Text>
             </Pressable>
           </View>
+
+          <View style={styles.heroBottom}>
+            <Text style={styles.heroEyebrow}>Bean detail</Text>
+            <Text style={styles.heroTitle}>{beanTitle}</Text>
+            <Text style={styles.heroSubtitle}>
+              {beanOrigin} • {beanProcess}
+            </Text>
+          </View>
         </View>
 
-        <View style={styles.sectionHeaderSimple}>
-          <Text style={styles.sectionTitleInline}>Flavor Notes</Text>
-          {loading ? <ActivityIndicator color="#9A4600" /> : null}
+        <View style={styles.summaryCard}>
+          <View style={styles.summaryTopRow}>
+            <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
+              <Text style={styles.roasterLink}>by {beanRoasterName}</Text>
+            </Pressable>
+
+            <View style={styles.roastPill}>
+              <Text style={styles.roastPillText}>{beanRoast}</Text>
+            </View>
+          </View>
+
+          <Text style={styles.summaryText}>{beanDescription}</Text>
+
+          {primaryCafe ? (
+            <View style={styles.localCue}>
+              <Text style={styles.localCueEyebrow}>Nearby now</Text>
+              <Text style={styles.localCueText}>
+                Available at {primaryCafe.name}
+                {primaryAvailability?.freshness_note
+                  ? ` • ${primaryAvailability.freshness_note}`
+                  : ""}
+              </Text>
+            </View>
+          ) : null}
+
+          <View style={styles.availabilityRow}>
+            {availabilityChips.map((item) => (
+              <View key={item} style={styles.availabilityChip}>
+                <Text style={styles.availabilityChipText}>{item}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionEyebrow}>Sensory profile</Text>
+            <Text style={styles.sectionTitle}>Flavor notes</Text>
+          </View>
+          {loading ? <ActivityIndicator color={colors.accentPrimary} /> : null}
         </View>
 
         <View style={styles.notesWrap}>
@@ -293,7 +324,13 @@ export default function BeanDetailScreen() {
           ))}
         </View>
 
-        <Text style={styles.sectionTitle}>How was it?</Text>
+        <View style={styles.sectionHeader}>
+          <View>
+            <Text style={styles.sectionEyebrow}>Tasting memory</Text>
+            <Text style={styles.sectionTitle}>How was it?</Text>
+          </View>
+        </View>
+
         <View style={styles.reactionRow}>
           {[
             { value: "loved_it" as BeanReaction, emoji: "♥", label: "Loved it" },
@@ -335,7 +372,10 @@ export default function BeanDetailScreen() {
         </View>
 
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitleInline}>Where to drink this nearby</Text>
+          <View>
+            <Text style={styles.sectionEyebrow}>Nearby places</Text>
+            <Text style={styles.sectionTitle}>Where to drink this</Text>
+          </View>
           <Text style={styles.sectionLink}>See map</Text>
         </View>
 
@@ -375,263 +415,260 @@ export default function BeanDetailScreen() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: "#FCF9F4",
+    backgroundColor: colors.canvas,
   },
   screen: {
     flex: 1,
-    backgroundColor: "#FCF9F4",
+    backgroundColor: colors.canvas,
   },
   content: {
-    paddingBottom: 32,
+    paddingBottom: spacing.section,
   },
   hero: {
-    height: 300,
-    backgroundColor: "#2C211C",
-    justifyContent: "flex-start",
-    paddingHorizontal: 24,
+    height: 380,
+    backgroundColor: colors.heroDark,
+    justifyContent: "space-between",
+    paddingHorizontal: spacing.screen,
     paddingTop: 20,
+    paddingBottom: spacing.xl,
   },
-  backButton: {
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.18)",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+  heroOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.08)",
   },
-  backText: {
-    color: "#FFFFFF",
-    fontWeight: "600",
-  },
-  card: {
-    backgroundColor: "#F1ECE5",
-    marginTop: -28,
-    marginHorizontal: 20,
-    borderRadius: 28,
-    padding: 20,
-    gap: 14,
-  },
-  topMetaRow: {
+  heroTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    zIndex: 1,
   },
-  originMeta: {
-    color: "#7A675C",
-    fontSize: 12,
-    fontWeight: "700",
-    textTransform: "uppercase",
-    letterSpacing: 1.2,
+  heroAction: {
+    minWidth: 48,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: "rgba(255,255,255,0.16)",
+    alignItems: "center",
+    justifyContent: "center",
   },
-  roastChip: {
-    backgroundColor: "#DFE8D8",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+  heroActionActive: {
+    backgroundColor: "rgba(255,255,255,0.24)",
   },
-  roastChipText: {
-    color: "#5A6A54",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  title: {
-    fontSize: 36,
-    lineHeight: 40,
-    color: "#1C1C19",
-    fontWeight: "700",
-  },
-  roaster: {
-    color: "#554339",
-    fontSize: 16,
-  },
-  matchBox: {
-    backgroundColor: "#F8F3EE",
-    borderRadius: 16,
-    padding: 14,
-  },
-  matchText: {
-    color: "#7D3400",
+  heroActionText: {
+    color: colors.textOnDark,
     fontSize: 15,
-    fontWeight: "600",
+    fontWeight: "700",
+  },
+  heroBottom: {
+    zIndex: 1,
+    gap: spacing.sm,
+  },
+  heroEyebrow: {
+    ...typography.eyebrow,
+    color: "rgba(255,255,255,0.72)",
+  },
+  heroTitle: {
+    fontSize: 42,
+    lineHeight: 46,
+    fontWeight: "700",
+    color: colors.textOnDark,
+    maxWidth: 300,
+  },
+  heroSubtitle: {
+    fontSize: 16,
+    lineHeight: 24,
+    color: "rgba(255,255,255,0.84)",
+  },
+  summaryCard: {
+    backgroundColor: colors.surface,
+    marginTop: -32,
+    marginHorizontal: spacing.screen,
+    borderRadius: radius.xxl,
+    padding: spacing.xl,
+    gap: spacing.lg,
+    ...shadows.card,
+  },
+  summaryTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: spacing.md,
+  },
+  roasterLink: {
+    ...typography.body,
+    color: colors.textSecondary,
+    flex: 1,
+  },
+  roastPill: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  roastPillText: {
+    ...typography.pill,
+    color: colors.successText,
+    fontWeight: "700",
+  },
+  summaryText: {
+    ...typography.bodyCompact,
+  },
+  localCue: {
+    backgroundColor: colors.surfaceSoft,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    gap: spacing.xs,
+  },
+  localCueEyebrow: {
+    ...typography.eyebrow,
+  },
+  localCueText: {
+    ...typography.bodyCompact,
+    color: colors.accentDeep,
   },
   availabilityRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
+    gap: spacing.sm,
   },
   availabilityChip: {
-    backgroundColor: "#EFE7DE",
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    borderRadius: 999,
+    backgroundColor: colors.accentSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
   },
   availabilityChipText: {
-    color: "#6B4B38",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  actionRow: {
-    marginTop: 4,
-  },
-  primaryButton: {
-    flex: 1,
-    backgroundColor: "#9A4600",
-    paddingVertical: 16,
-    borderRadius: 999,
-    alignItems: "center",
-  },
-  primaryButtonActive: {
-    backgroundColor: "#6F7D57",
-  },
-  primaryButtonText: {
-    color: "#FFFFFF",
-    fontSize: 16,
+    ...typography.pill,
+    color: colors.accentDeep,
     fontWeight: "700",
   },
   buttonDisabled: {
     opacity: 0.7,
   },
-  sectionHeaderSimple: {
+  sectionHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginTop: 26,
-    marginBottom: 14,
+    alignItems: "flex-end",
+    paddingHorizontal: spacing.screen,
+    marginTop: spacing.section,
+    marginBottom: spacing.lg,
+    gap: spacing.md,
+  },
+  sectionEyebrow: {
+    ...typography.eyebrow,
   },
   sectionTitle: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: "#1C1C19",
-    fontWeight: "700",
-    marginTop: 26,
-    marginBottom: 14,
-    paddingHorizontal: 24,
+    ...typography.sectionTitle,
   },
-  sectionTitleInline: {
-    fontSize: 28,
-    lineHeight: 32,
-    color: "#1C1C19",
+  sectionLink: {
+    color: colors.accentPrimary,
+    fontSize: 14,
     fontWeight: "700",
   },
   notesWrap: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 10,
-    paddingHorizontal: 24,
+    gap: spacing.sm,
+    paddingHorizontal: spacing.screen,
   },
   noteChip: {
-    backgroundColor: "#F1ECE5",
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 999,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.pill,
   },
   noteChipText: {
-    color: "#554339",
-    fontSize: 14,
+    ...typography.bodyCompact,
     fontWeight: "600",
+    color: colors.textSecondary,
   },
   reactionRow: {
     flexDirection: "row",
-    gap: 12,
-    paddingHorizontal: 24,
+    gap: spacing.md,
+    paddingHorizontal: spacing.screen,
   },
   reactionCard: {
     flex: 1,
-    backgroundColor: "#F1ECE5",
-    borderRadius: 20,
-    paddingVertical: 18,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.xl,
     alignItems: "center",
-    gap: 8,
+    gap: spacing.sm,
   },
   reactionCardActive: {
-    backgroundColor: "#E4EBDD",
+    backgroundColor: colors.successSoft,
     borderWidth: 1.5,
-    borderColor: "#6F7D57",
+    borderColor: colors.successBorder,
   },
   reactionEmoji: {
     fontSize: 18,
-    color: "#7D3400",
+    color: colors.accentDeep,
   },
   reactionEmojiActive: {
-    color: "#4E5C3D",
+    color: colors.successText,
   },
   reactionText: {
-    color: "#554339",
-    fontSize: 13,
+    ...typography.pill,
+    color: colors.textSecondary,
     fontWeight: "700",
     textTransform: "uppercase",
   },
   reactionTextActive: {
-    color: "#4E5C3D",
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 24,
-    marginTop: 26,
-    marginBottom: 14,
-  },
-  sectionLink: {
-    color: "#9A4600",
-    fontSize: 14,
-    fontWeight: "700",
+    color: colors.successText,
   },
   cafesWrap: {
-    gap: 14,
-    paddingHorizontal: 24,
+    gap: spacing.md,
+    paddingHorizontal: spacing.screen,
   },
   cafeCard: {
-    backgroundColor: "#F1ECE5",
-    borderRadius: 24,
-    padding: 14,
+    backgroundColor: colors.surface,
+    borderRadius: radius.xl,
+    padding: spacing.md,
     flexDirection: "row",
-    gap: 14,
+    gap: spacing.md,
   },
   cafeImage: {
-    width: 72,
-    height: 72,
-    borderRadius: 16,
-    backgroundColor: "#B9A18F",
+    width: 76,
+    height: 76,
+    borderRadius: radius.md,
+    backgroundColor: colors.heroSoft,
   },
   cafeBody: {
     flex: 1,
-    gap: 8,
+    gap: spacing.sm,
+    justifyContent: "center",
   },
   cafeTopRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 8,
+    gap: spacing.sm,
   },
   cafeName: {
+    ...typography.cardTitleCompact,
     flex: 1,
-    fontSize: 20,
-    color: "#1C1C19",
-    fontWeight: "700",
   },
   cafeDistance: {
-    color: "#7A675C",
-    fontSize: 13,
+    ...typography.meta,
   },
   cafeFreshness: {
-    color: "#9A4600",
+    color: colors.accentPrimary,
     fontSize: 13,
     fontWeight: "700",
   },
   cafeTypesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: 8,
+    gap: spacing.sm,
   },
   cafeTypeChip: {
-    backgroundColor: "#EFE7DE",
-    paddingHorizontal: 10,
-    paddingVertical: 7,
-    borderRadius: 999,
+    backgroundColor: colors.surfaceSoft,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
   },
   cafeTypeChipText: {
-    color: "#6B4B38",
-    fontSize: 12,
+    ...typography.pill,
+    color: colors.textSecondary,
     fontWeight: "700",
   },
 });
