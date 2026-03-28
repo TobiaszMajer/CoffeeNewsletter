@@ -25,6 +25,7 @@ import {
   type BeanReaction,
 } from "../../lib/reactions";
 import { colors, radius, shadows, spacing, typography } from "../theme";
+import { useI18n } from "../../hooks/useI18n";
 
 type LiveBean = {
   id: string;
@@ -70,6 +71,8 @@ function firstRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 export default function BeanDetailScreen() {
+  const { t } = useI18n();
+
   const { id } = useLocalSearchParams<{ id: string }>();
   const slug = id ?? "guji-natural";
 
@@ -212,7 +215,7 @@ export default function BeanDetailScreen() {
       setIsFavorited(nextState);
     } catch (error) {
       console.error(error);
-      Alert.alert("Could not update favorite state");
+      Alert.alert(t("beanDetail.favoriteError"));
     } finally {
       setIsFavoriteLoading(false);
     }
@@ -227,11 +230,19 @@ export default function BeanDetailScreen() {
       setCurrentReaction(nextReaction);
     } catch (error) {
       console.error(error);
-      Alert.alert("Could not save reaction");
+      Alert.alert(t("beanDetail.reactionError"));
     } finally {
       setIsReactionLoading(false);
     }
   }
+
+  const nearbyNowText = primaryCafe
+    ? `${t("beanDetail.availableAt", { venue: primaryCafe.name })}${
+        primaryAvailability?.freshness_note
+          ? ` • ${primaryAvailability.freshness_note}`
+          : ""
+      }`
+    : null;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -247,7 +258,7 @@ export default function BeanDetailScreen() {
 
           <View style={styles.heroTopRow}>
             <Pressable onPress={() => router.back()} style={styles.heroAction}>
-              <Text style={styles.heroActionText}>Back</Text>
+              <Text style={styles.heroActionText}>{t("common.back")}</Text>
             </Pressable>
 
             <Pressable
@@ -280,22 +291,19 @@ export default function BeanDetailScreen() {
           <Text style={styles.title}>{beanTitle}</Text>
 
           <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
-            <Text style={styles.roasterLink}>Roaster: {beanRoasterName}</Text>
+            <Text style={styles.roasterLink}>
+              {t("beanDetail.roaster", { name: beanRoasterName })}
+            </Text>
           </Pressable>
 
           <View style={styles.matchBox}>
             <Text style={styles.matchText}>{beanDescription}</Text>
           </View>
 
-          {primaryCafe ? (
+          {nearbyNowText ? (
             <View style={styles.localCue}>
-              <Text style={styles.localCueEyebrow}>Nearby now</Text>
-              <Text style={styles.localCueText}>
-                Available at {primaryCafe.name}
-                {primaryAvailability?.freshness_note
-                  ? ` • ${primaryAvailability.freshness_note}`
-                  : ""}
-              </Text>
+              <Text style={styles.localCueEyebrow}>{t("beanDetail.nearbyNow")}</Text>
+              <Text style={styles.localCueText}>{nearbyNowText}</Text>
             </View>
           ) : null}
 
@@ -310,8 +318,8 @@ export default function BeanDetailScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>Sensory profile</Text>
-            <Text style={styles.sectionTitle}>Flavor notes</Text>
+            <Text style={styles.sectionEyebrow}>{t("beanDetail.sensoryProfile")}</Text>
+            <Text style={styles.sectionTitle}>{t("beanDetail.flavorNotes")}</Text>
           </View>
           {loading ? <ActivityIndicator color={colors.accentPrimary} /> : null}
         </View>
@@ -326,16 +334,16 @@ export default function BeanDetailScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>Tasting memory</Text>
-            <Text style={styles.sectionTitle}>How was it?</Text>
+            <Text style={styles.sectionEyebrow}>{t("beanDetail.tastingMemory")}</Text>
+            <Text style={styles.sectionTitle}>{t("beanDetail.howWasIt")}</Text>
           </View>
         </View>
 
         <View style={styles.reactionRow}>
           {[
-            { value: "loved_it" as BeanReaction, emoji: "♥", label: "Loved it" },
-            { value: "liked_it" as BeanReaction, emoji: "👍", label: "Liked it" },
-            { value: "not_for_me" as BeanReaction, emoji: "☹", label: "Not for me" },
+            { value: "loved_it" as BeanReaction, emoji: "♥", label: t("beanDetail.lovedIt") },
+            { value: "liked_it" as BeanReaction, emoji: "👍", label: t("beanDetail.likedIt") },
+            { value: "not_for_me" as BeanReaction, emoji: "☹", label: t("beanDetail.notForMe") },
           ].map((item) => {
             const active = currentReaction === item.value;
 
@@ -373,10 +381,10 @@ export default function BeanDetailScreen() {
 
         <View style={styles.sectionHeader}>
           <View>
-            <Text style={styles.sectionEyebrow}>Nearby places</Text>
-            <Text style={styles.sectionTitle}>Where to drink this</Text>
+            <Text style={styles.sectionEyebrow}>{t("beanDetail.nearbyPlaces")}</Text>
+            <Text style={styles.sectionTitle}>{t("beanDetail.whereToDrink")}</Text>
           </View>
-          <Text style={styles.sectionLink}>See map</Text>
+          <Text style={styles.sectionLink}>{t("common.seeMap")}</Text>
         </View>
 
         <View style={styles.cafesWrap}>

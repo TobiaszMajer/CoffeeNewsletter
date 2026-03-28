@@ -27,7 +27,7 @@ export const en = {
     searchAction: "Explore",
     forYou: "For you",
     bestMatches: "Best matches nearby",
-    freshness: "Freshness",
+    freshness: "News",
     freshDrops: "Fresh drops today",
     tasteCue: "Taste cue",
     tasteDirection: "What suits you lately",
