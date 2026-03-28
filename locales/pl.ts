@@ -50,6 +50,8 @@ export const pl = {
     lovedIt: "Uwielbiam",
     likedIt: "Smaczne",
     notForMe: "Nie dla mnie",
+    favoriteError: "Nie udało się zaktualizować stanu ulubionych",
+    reactionError: "Nie udało się zapisać reakcji",
   },
 
   activity: {
