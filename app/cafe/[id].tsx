@@ -19,6 +19,8 @@ import {
   isEntityFollowed,
   toggleSaveEntity,
   toggleFollowEntity,
+  isEntityFavorited,
+  toggleFavoriteEntity,
 } from "../../lib/user-actions";
 
 type LiveCafe = {
@@ -93,28 +95,25 @@ export default function CafeDetailScreen() {
   const [liveCafe, setLiveCafe] = useState<LiveCafe | null>(null);
   const [liveBeans, setLiveBeans] = useState<LiveCafeBean[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
 
 useFocusEffect(
   useCallback(() => {
     let active = true;
 
-    async function loadActionState() {
+    async function loadFavoriteState() {
       try {
-        const [saved, followed] = await Promise.all([
-          isEntitySaved("cafe", slug),
-          isEntityFollowed("cafe", slug),
-        ]);
+        const favorited = await isEntityFavorited("cafe", slug);
 
         if (!active) return;
-
-        setIsSaved(saved);
-        setIsFollowed(followed);
+        setIsFavorited(favorited);
       } catch (error) {
-        console.error("Failed to load cafe action state", error);
+        console.error("Failed to load cafe favorite state", error);
       }
     }
 
-    void loadActionState();
+    void loadFavoriteState();
 
     return () => {
       active = false;
@@ -122,33 +121,18 @@ useFocusEffect(
   }, [slug])
 );
 
-async function handleToggleSave() {
-  if (isSaveLoading) return;
+async function handleToggleFavorite() {
+  if (isFavoriteLoading) return;
 
   try {
-    setIsSaveLoading(true);
-    const nextState = await toggleSaveEntity("cafe", slug);
-    setIsSaved(nextState);
+    setIsFavoriteLoading(true);
+    const nextState = await toggleFavoriteEntity("cafe", slug);
+    setIsFavorited(nextState);
   } catch (error) {
     console.error(error);
-    Alert.alert("Could not update save state");
+    Alert.alert("Could not update favorite state");
   } finally {
-    setIsSaveLoading(false);
-  }
-}
-
-async function handleToggleFollow() {
-  if (isFollowLoading) return;
-
-  try {
-    setIsFollowLoading(true);
-    const nextState = await toggleFollowEntity("cafe", slug);
-    setIsFollowed(nextState);
-  } catch (error) {
-    console.error(error);
-    Alert.alert("Could not update follow state");
-  } finally {
-    setIsFollowLoading(false);
+    setIsFavoriteLoading(false);
   }
 }
 
@@ -219,38 +203,19 @@ async function handleToggleFollow() {
               <Pressable
                 style={[
                   styles.iconButton,
-                  isSaved && styles.iconButtonActive,
-                  isSaveLoading && styles.iconButtonDisabled,
+                  isFavorited && styles.iconButtonActive,
+                  isFavoriteLoading && styles.iconButtonDisabled,
                 ]}
-                onPress={handleToggleSave}
-                disabled={isSaveLoading}
+                onPress={handleToggleFavorite}
+                disabled={isFavoriteLoading}
               >
                 <Text
                   style={[
                     styles.iconButtonText,
-                    isSaved && styles.iconButtonTextActive,
+                    isFavorited && styles.iconButtonTextActive,
                   ]}
                 >
-                  {isSaveLoading ? "…" : isSaved ? "✓" : "⌑"}
-                </Text>
-              </Pressable>
-
-              <Pressable
-                style={[
-                  styles.iconButton,
-                  isFollowed && styles.iconButtonActive,
-                  isFollowLoading && styles.iconButtonDisabled,
-                ]}
-                onPress={handleToggleFollow}
-                disabled={isFollowLoading}
-              >
-                <Text
-                  style={[
-                    styles.iconButtonText,
-                    isFollowed && styles.iconButtonTextActive,
-                  ]}
-                >
-                  {isFollowLoading ? "…" : isFollowed ? "✓" : "＋"}
+                  {isFavoriteLoading ? "…" : isFavorited ? "♥" : "♡"}
                 </Text>
               </Pressable>
             </View>
@@ -357,7 +322,7 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
-    backgroundColor: "#FCF9F4",
+    backgroundColor: "#f3efea",
   },
   content: {
     paddingBottom: 32,
@@ -413,25 +378,25 @@ const styles = StyleSheet.create({
   iconButton: {
     width: 42,
     height: 42,
-    borderRadius: 999,
-    backgroundColor: "#FCF9F4",
+    //borderRadius: 999,
+    //backgroundColor: "#F1ECE5",
     alignItems: "center",
     justifyContent: "center",
   },
     iconButtonActive: {
-    backgroundColor: "#E4EBDD",
-    borderWidth: 1.5,
-    borderColor: "#6F7D57",
+    backgroundColor: "#F1ECE5",
+    //borderWidth: 1.5,
+    //borderColor: "#6F7D57",
   },
   iconButtonTextActive: {
-    color: "#4E5C3D",
+    color: "#ff0000f8",
   },
   iconButtonDisabled: {
-    opacity: 0.7,
+    opacity: 0.1,
   },
   iconButtonText: {
-    color: "#9A4600",
-    fontSize: 18,
+    color: "#ff0000f8",
+    fontSize:30,
     fontWeight: "700",
   },
   description: {

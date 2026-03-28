@@ -20,6 +20,8 @@ import {
   isEntityFollowed,
   toggleSaveEntity,
   toggleFollowEntity,
+  isEntityFavorited,
+  toggleFavoriteEntity,
 } from "../../lib/user-actions";
 
 type LiveRoaster = {
@@ -43,10 +45,8 @@ export default function RoasterDetailScreen() {
 
   const fallback = mockRoasters[slug] ?? mockRoasters["dark-arts-coffee"];
 
-  const [isSaved, setIsSaved] = useState(false);
-  const [isFollowed, setIsFollowed] = useState(false);
-  const [isSaveLoading, setIsSaveLoading] = useState(false);
-  const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
 
   const [liveRoaster, setLiveRoaster] = useState<LiveRoaster | null>(null);
   const [liveBeans, setLiveBeans] = useState<LiveBean[]>([]);
@@ -91,23 +91,18 @@ export default function RoasterDetailScreen() {
     useCallback(() => {
       let active = true;
 
-      async function loadActionState() {
+      async function loadFavoriteState() {
         try {
-          const [saved, followed] = await Promise.all([
-            isEntitySaved("roaster", slug),
-            isEntityFollowed("roaster", slug),
-          ]);
+          const favorited = await isEntityFavorited("roaster", slug);
 
           if (!active) return;
-
-          setIsSaved(saved);
-          setIsFollowed(followed);
+          setIsFavorited(favorited);
         } catch (error) {
-          console.error("Failed to load roaster action state", error);
+          console.error("Failed to load roaster favorite state", error);
         }
       }
 
-      void loadActionState();
+      void loadFavoriteState();
 
       return () => {
         active = false;
@@ -115,33 +110,18 @@ export default function RoasterDetailScreen() {
     }, [slug])
   );
 
-  async function handleToggleSave() {
-    if (isSaveLoading) return;
+  async function handleToggleFavorite() {
+    if (isFavoriteLoading) return;
 
     try {
-      setIsSaveLoading(true);
-      const nextState = await toggleSaveEntity("roaster", slug);
-      setIsSaved(nextState);
+      setIsFavoriteLoading(true);
+      const nextState = await toggleFavoriteEntity("roaster", slug);
+      setIsFavorited(nextState);
     } catch (error) {
       console.error(error);
-      Alert.alert("Could not update save state");
+      Alert.alert("Could not update favorite state");
     } finally {
-      setIsSaveLoading(false);
-    }
-  }
-
-  async function handleToggleFollow() {
-    if (isFollowLoading) return;
-
-    try {
-      setIsFollowLoading(true);
-      const nextState = await toggleFollowEntity("roaster", slug);
-      setIsFollowed(nextState);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Could not update follow state");
-    } finally {
-      setIsFollowLoading(false);
+      setIsFavoriteLoading(false);
     }
   }
 
@@ -193,33 +173,14 @@ export default function RoasterDetailScreen() {
             <Pressable
               style={[
                 styles.primaryButton,
-                isSaved && styles.primaryButtonActive,
-                isSaveLoading && styles.buttonDisabled,
+                isFavorited && styles.primaryButtonActive,
+                isFavoriteLoading && styles.buttonDisabled,
               ]}
-              onPress={handleToggleSave}
-              disabled={isSaveLoading}
+              onPress={handleToggleFavorite}
+              disabled={isFavoriteLoading}
             >
               <Text style={styles.primaryButtonText}>
-                {isSaveLoading ? "Updating…" : isSaved ? "Saved" : "Save"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.secondaryButton,
-                isFollowed && styles.secondaryButtonActive,
-                isFollowLoading && styles.buttonDisabled,
-              ]}
-              onPress={handleToggleFollow}
-              disabled={isFollowLoading}
-            >
-              <Text
-                style={[
-                  styles.secondaryButtonText,
-                  isFollowed && styles.secondaryButtonTextActive,
-                ]}
-              >
-                {isFollowLoading ? "Updating…" : isFollowed ? "Following" : "Follow"}
+                {isFavoriteLoading ? "Updating…" : isFavorited ? "Favorited" : "Favorite"}
               </Text>
             </Pressable>
           </View>

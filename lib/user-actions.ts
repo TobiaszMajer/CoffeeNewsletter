@@ -2,6 +2,35 @@ import { supabase } from './supabase';
 
 export type SaveEntityType = 'bean' | 'cafe' | 'roaster';
 export type FollowEntityType = 'cafe' | 'roaster';
+export type FavoriteEntityType = 'bean' | 'cafe' | 'roaster';
+
+export async function isEntityFavorited(
+  entityType: FavoriteEntityType,
+  entitySlug: string
+): Promise<boolean> {
+  return isEntitySaved(entityType, entitySlug);
+}
+
+export async function favoriteEntity(
+  entityType: FavoriteEntityType,
+  entitySlug: string
+): Promise<void> {
+  return saveEntity(entityType, entitySlug);
+}
+
+export async function unfavoriteEntity(
+  entityType: FavoriteEntityType,
+  entitySlug: string
+): Promise<void> {
+  return unsaveEntity(entityType, entitySlug);
+}
+
+export async function toggleFavoriteEntity(
+  entityType: FavoriteEntityType,
+  entitySlug: string
+): Promise<boolean> {
+  return toggleSaveEntity(entityType, entitySlug);
+}
 
 async function getRequiredUserId(): Promise<string> {
   const {

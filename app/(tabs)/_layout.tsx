@@ -1,7 +1,7 @@
 import React from "react";
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-
+import MaterialIcons from '@expo/vector-icons/MaterialIcons';
 export default function TabsLayout() {
   return (
     <Tabs
@@ -45,7 +45,7 @@ export default function TabsLayout() {
         options={{
           title: "Saved",
           tabBarIcon: ({ color, size }) => (
-            <Ionicons name="bookmark-outline" size={size} color={color} />
+            <MaterialIcons name="favorite-outline" size={size} color={color} />
           ),
         }}
       />

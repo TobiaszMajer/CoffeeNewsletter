@@ -20,6 +20,8 @@ import {
   isEntityFollowed,
   toggleSaveEntity,
   toggleFollowEntity,
+  isEntityFavorited,
+  toggleFavoriteEntity,
 } from "../../lib/user-actions";
 
 type LiveBean = {
@@ -74,12 +76,9 @@ export default function BeanDetailScreen() {
   const [liveBean, setLiveBean] = useState<LiveBean | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<LiveAvailability[]>([]);
   const [loading, setLoading] = useState(true);
-
-  const [isSaved, setIsSaved] = useState(false);
-  const [isSaveLoading, setIsSaveLoading] = useState(false);
-  const [isRoasterFollowed, setIsRoasterFollowed] = useState(false);
-  const [isRoasterFollowLoading, setIsRoasterFollowLoading] = useState(false);
-
+  const [isFavorited, setIsFavorited] = useState(false);
+  const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
+  
   useEffect(() => {
     let mounted = true;
 
@@ -155,57 +154,37 @@ export default function BeanDetailScreen() {
     useCallback(() => {
       let active = true;
 
-      async function loadActionState() {
+      async function loadFavoriteState() {
         try {
-          const [saved, followed] = await Promise.all([
-            isEntitySaved("bean", slug),
-            isEntityFollowed("roaster", beanRoasterSlug),
-          ]);
+          const favorited = await isEntityFavorited("bean", slug);
 
           if (!active) return;
-
-          setIsSaved(saved);
-          setIsRoasterFollowed(followed);
+          setIsFavorited(favorited);
         } catch (error) {
-          console.error("Failed to load bean action state", error);
+          console.error("Failed to load bean favorite state", error);
         }
       }
 
-      void loadActionState();
+      void loadFavoriteState();
 
       return () => {
         active = false;
       };
-    }, [slug, beanRoasterSlug])
+    }, [slug])
   );
 
-  async function handleToggleSave() {
-    if (isSaveLoading) return;
+  async function handleToggleFavorite() {
+    if (isFavoriteLoading) return;
 
     try {
-      setIsSaveLoading(true);
-      const nextState = await toggleSaveEntity("bean", slug);
-      setIsSaved(nextState);
+      setIsFavoriteLoading(true);
+      const nextState = await toggleFavoriteEntity("bean", slug);
+      setIsFavorited(nextState);
     } catch (error) {
       console.error(error);
-      Alert.alert("Could not update save state");
+      Alert.alert("Could not update favorite state");
     } finally {
-      setIsSaveLoading(false);
-    }
-  }
-
-  async function handleToggleRoasterFollow() {
-    if (!beanRoasterSlug || isRoasterFollowLoading) return;
-
-    try {
-      setIsRoasterFollowLoading(true);
-      const nextState = await toggleFollowEntity("roaster", beanRoasterSlug);
-      setIsRoasterFollowed(nextState);
-    } catch (error) {
-      console.error(error);
-      Alert.alert("Could not update follow state");
-    } finally {
-      setIsRoasterFollowLoading(false);
+      setIsFavoriteLoading(false);
     }
   }
 
@@ -255,37 +234,14 @@ export default function BeanDetailScreen() {
             <Pressable
               style={[
                 styles.primaryButton,
-                isSaved && styles.primaryButtonActive,
-                isSaveLoading && styles.buttonDisabled,
+                isFavorited && styles.primaryButtonActive,
+                isFavoriteLoading && styles.buttonDisabled,
               ]}
-              onPress={handleToggleSave}
-              disabled={isSaveLoading}
+              onPress={handleToggleFavorite}
+              disabled={isFavoriteLoading}
             >
               <Text style={styles.primaryButtonText}>
-                {isSaveLoading ? "Updating…" : isSaved ? "Saved" : "Save Bean"}
-              </Text>
-            </Pressable>
-
-            <Pressable
-              style={[
-                styles.secondaryButton,
-                isRoasterFollowed && styles.secondaryButtonActive,
-                isRoasterFollowLoading && styles.buttonDisabled,
-              ]}
-              onPress={handleToggleRoasterFollow}
-              disabled={isRoasterFollowLoading}
-            >
-              <Text
-                style={[
-                  styles.secondaryButtonText,
-                  isRoasterFollowed && styles.secondaryButtonTextActive,
-                ]}
-              >
-                {isRoasterFollowLoading
-                  ? "Updating…"
-                  : isRoasterFollowed
-                    ? "Following"
-                    : "Follow Roaster"}
+                {isFavoriteLoading ? "Updating…" : isFavorited ? "Favorited" : "Favorite"}
               </Text>
             </Pressable>
           </View>
@@ -456,8 +412,8 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   actionRow: {
-    flexDirection: "row",
-    gap: 12,
+    //flexDirection: "row",
+    //gap: 12,
     marginTop: 4,
   },
   primaryButton: {
@@ -474,27 +430,6 @@ const styles = StyleSheet.create({
     color: "#FFFFFF",
     fontSize: 16,
     fontWeight: "700",
-  },
-  secondaryButton: {
-    flex: 1,
-    borderWidth: 1.5,
-    borderColor: "#9A4600",
-    paddingVertical: 16,
-    borderRadius: 999,
-    alignItems: "center",
-    backgroundColor: "#FCF9F4",
-  },
-  secondaryButtonActive: {
-    backgroundColor: "#EEE6DB",
-    borderColor: "#6F7D57",
-  },
-  secondaryButtonText: {
-    color: "#9A4600",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  secondaryButtonTextActive: {
-    color: "#4E5C3D",
   },
   buttonDisabled: {
     opacity: 0.7,

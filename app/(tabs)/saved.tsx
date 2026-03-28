@@ -76,9 +76,9 @@ export default function SavedScreen() {
   );
 
   const countText = useMemo(() => {
-    if (activeTab === "Beans") return `${saved.beans.length} saved`;
-    if (activeTab === "Cafés") return `${saved.cafes.length} saved`;
-    return `${saved.roasters.length} saved`;
+    if (activeTab === "Beans") return `${saved.beans.length} favorited`;
+    if (activeTab === "Cafés") return `${saved.cafes.length} favorited`;
+    return `${saved.roasters.length} favorited`;
   }, [activeTab, saved]);
 
   const isEmpty =
@@ -93,7 +93,7 @@ export default function SavedScreen() {
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.titleRow}>
-        <Text style={styles.title}>Saved</Text>
+        <Text style={styles.title}>Favorites</Text>
         {loading ? <ActivityIndicator color="#9A4600" /> : null}
       </View>
 
@@ -125,18 +125,18 @@ export default function SavedScreen() {
 
       <View style={styles.summaryCard}>
         <Text style={styles.summaryEyebrow}>Collection</Text>
-        <Text style={styles.summaryTitle}>Saved for later</Text>
-        <Text style={styles.summaryText}>
-          Your saved places and coffees now come from the live backend.
-        </Text>
+        <Text style={styles.summaryTitle}>Your favorites</Text>
+        {/* <Text style={styles.summaryText}>
+          Your favorited places and coffees now come from the live backend.
+        </Text> */}
         <Text style={styles.summaryMeta}>{countText}</Text>
       </View>
 
       {isEmpty ? (
         <View style={styles.emptyCard}>
-          <Text style={styles.emptyTitle}>Nothing saved yet</Text>
+          <Text style={styles.emptyTitle}>Nothing favorited yet</Text>
           <Text style={styles.emptyText}>
-            Save a bean, café, or roaster and it will appear here.
+            Favorite a bean, café, or roaster and it will appear here.
           </Text>
         </View>
       ) : null}
