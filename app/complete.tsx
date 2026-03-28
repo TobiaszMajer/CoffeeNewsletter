@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,13 +7,66 @@ import {
   SafeAreaView,
   StatusBar,
   ImageBackground,
+  Alert,
 } from "react-native";
-import { Alert } from "react-native";
-import { ensureProfile } from "../lib/auth";
 import { router } from "expo-router";
+import {
+  clearOnboardingDraft,
+  getOnboardingDraft,
+  persistOnboardingProfile,
+  type OnboardingDraft,
+} from "../lib/onboarding";
 
 export default function CompleteScreen() {
   const [loading, setLoading] = useState(false);
+  const [draft, setDraft] = useState<OnboardingDraft | null>(null);
+
+  useEffect(() => {
+    let active = true;
+
+    async function loadDraft() {
+      try {
+        const data = await getOnboardingDraft();
+        if (!active) return;
+        setDraft(data);
+      } catch (error) {
+        console.error("Failed to load onboarding draft", error);
+      }
+    }
+
+    void loadDraft();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const summaryTitle = useMemo(() => {
+    const discovery = draft?.discovery_style ?? "Balanced";
+    const roast = (draft?.roast_preference ?? "Light").toLowerCase();
+    return `${discovery} & ${roast}`;
+  }, [draft]);
+
+  const summaryText = useMemo(() => {
+    const flavors = draft?.flavor_preferences ?? ["Caramel"];
+    const drinkStyle = draft?.drink_style ?? "All";
+
+    return `We’ll start by prioritizing ${flavors
+      .slice(0, 2)
+      .join(", ")
+      .toLowerCase()} profiles and coffees that work well for ${drinkStyle.toLowerCase()}.`;
+  }, [draft]);
+
+  const summaryTags = useMemo(() => {
+    const flavors = draft?.flavor_preferences ?? ["Caramel"];
+    const roast = draft?.roast_preference;
+    const discovery = draft?.discovery_style;
+
+    return [...flavors.slice(0, 2), roast, discovery]
+      .filter(Boolean)
+      .slice(0, 3) as string[];
+  }, [draft]);
+
   return (
     <ImageBackground
       source={{
@@ -51,45 +104,39 @@ export default function CompleteScreen() {
               <Text style={styles.badgeIcon}>✦</Text>
             </View>
 
-            <Text style={styles.summaryTitle}>Balanced & warm</Text>
+            <Text style={styles.summaryTitle}>{summaryTitle}</Text>
 
-            <Text style={styles.summaryText}>
-              Flavor notes like caramel, nutty sweetness, and soft fruit will
-              take priority in your feed.
-            </Text>
+            <Text style={styles.summaryText}>{summaryText}</Text>
 
             <View style={styles.tags}>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>Caramel</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>Nutty</Text>
-              </View>
-              <View style={styles.tag}>
-                <Text style={styles.tagText}>Balanced</Text>
-              </View>
+              {summaryTags.map((tag) => (
+                <View key={tag} style={styles.tag}>
+                  <Text style={styles.tagText}>{tag}</Text>
+                </View>
+              ))}
             </View>
           </View>
 
           <Pressable
             style={[styles.primaryButton, loading && { opacity: 0.7 }]}
             onPress={async () => {
-            try {
-              setLoading(true);
-              await ensureProfile();
-              router.replace("/(tabs)/home");
-            } catch (error) {
-              console.error(error);
-              Alert.alert("Could not start guest session");
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <Text style={styles.primaryButtonText}>
-            {loading ? "Starting..." : "Continue as guest"}
-          </Text>
-        </Pressable>
+              try {
+                setLoading(true);
+                await persistOnboardingProfile();
+                await clearOnboardingDraft();
+                router.replace("/(tabs)/home");
+              } catch (error) {
+                console.error(error);
+                Alert.alert("Could not save your onboarding profile");
+              } finally {
+                setLoading(false);
+              }
+            }}
+          >
+            <Text style={styles.primaryButtonText}>
+              {loading ? "Saving..." : "Continue as guest"}
+            </Text>
+          </Pressable>
 
           <Text style={styles.footerText}>
             You can create an account later.
@@ -192,6 +239,7 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     textAlign: "center",
     marginBottom: 10,
+    textTransform: "capitalize",
   },
   summaryText: {
     fontSize: 16,

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,14 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
+import {
+  getOnboardingDraft,
+  updateOnboardingDraft,
+} from "../lib/onboarding";
+
 
 type DrinkStyle = "Espresso" | "Filter" | "Milk Drinks" | "All";
 
@@ -48,7 +54,35 @@ export default function DrinkStyleScreen() {
   const [selected, setSelected] = useState<DrinkStyle>("Milk Drinks");
 
   const canContinue = useMemo(() => !!selected, [selected]);
+  const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadDraft() {
+      try {
+        const draft = await getOnboardingDraft();
+        if (!active) return;
+
+        if (
+          draft.drink_style === "Espresso" ||
+          draft.drink_style === "Filter" ||
+          draft.drink_style === "Milk Drinks" ||
+          draft.drink_style === "All"
+        ) {
+          setSelected(draft.drink_style);
+        }
+      } catch (error) {
+        console.error("Failed to load onboarding draft", error);
+      }
+    }
+
+    void loadDraft();
+
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -91,6 +125,7 @@ export default function DrinkStyleScreen() {
 
             return (
               <Pressable
+                
                 key={option.key}
                 onPress={() => setSelected(option.key)}
                 style={[
@@ -148,12 +183,22 @@ export default function DrinkStyleScreen() {
           <Text style={styles.stepText}>Step 4 of 6</Text>
 
           <Pressable
-            onPress={() => router.push("/discovery-style")}
-            disabled={!canContinue}
-            style={[
-              styles.button,
-              !canContinue && styles.buttonDisabled,
-            ]}
+            style={styles.button}
+            disabled={!canContinue || isSaving}
+            onPress={async () => {
+            try {
+              setIsSaving(true);
+              await updateOnboardingDraft({
+                drink_style: selected,
+              });
+              router.push("/discovery-style");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Could not save your drink preference");
+            } finally {
+              setIsSaving(false);
+            }
+          }}
           >
             <Text style={styles.buttonText}>Next</Text>
           </Pressable>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useMemo, useState ,useEffect } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,13 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert
 } from "react-native";
 import { router } from "expo-router";
-
+import {
+  getOnboardingDraft,
+  updateOnboardingDraft,
+} from "../lib/onboarding";
 type RoastOption = "Light" | "Medium" | "Darker";
 
 const ROASTS: {
@@ -49,7 +53,34 @@ export default function RoastScreen() {
   const [selected, setSelected] = useState<RoastOption>("Light");
 
   const canContinue = useMemo(() => !!selected, [selected]);
+  const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadDraft() {
+      try {
+        const draft = await getOnboardingDraft();
+        if (!active) return;
+
+        if (
+          draft.roast_preference === "Light" ||
+          draft.roast_preference === "Medium" ||
+          draft.roast_preference === "Darker"
+        ) {
+          setSelected(draft.roast_preference);
+        }
+      } catch (error) {
+        console.error("Failed to load onboarding draft", error);
+      }
+    }
+
+    void loadDraft();
+
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -180,12 +211,22 @@ export default function RoastScreen() {
 
       <View style={styles.footer}>
         <Pressable
-          onPress={() => router.push("/drink-style")}
-          disabled={!canContinue}
-          style={[
-            styles.button,
-            !canContinue && styles.buttonDisabled,
-          ]}
+          style={styles.button}
+          disabled={!canContinue || isSaving}
+          onPress={async () => {
+          try {
+            setIsSaving(true);
+            await updateOnboardingDraft({
+              roast_preference: selected,
+            });
+            router.push("/drink-style");
+          } catch (error) {
+            console.error(error);
+            Alert.alert("Could not save your roast preference");
+          } finally {
+            setIsSaving(false);
+          }
+        }}
         >
           <Text style={styles.buttonText}>Next</Text>
         </Pressable>

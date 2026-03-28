@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,8 +7,13 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
+import {
+  getOnboardingDraft,
+  updateOnboardingDraft,
+} from "../lib/onboarding";
 
 type DiscoveryStyle = "Safe" | "Balanced" | "Adventurous";
 
@@ -38,7 +43,34 @@ export default function DiscoveryStyleScreen() {
   const [selected, setSelected] = useState<DiscoveryStyle>("Balanced");
 
   const canContinue = useMemo(() => !!selected, [selected]);
+  const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    let active = true;
+
+    async function loadDraft() {
+      try {
+        const draft = await getOnboardingDraft();
+        if (!active) return;
+
+        if (
+          draft.discovery_style === "Safe" ||
+          draft.discovery_style === "Balanced" ||
+          draft.discovery_style === "Adventurous"
+        ) {
+          setSelected(draft.discovery_style);
+        }
+      } catch (error) {
+        console.error("Failed to load onboarding draft", error);
+      }
+    }
+
+    void loadDraft();
+
+    return () => {
+      active = false;
+    };
+  }, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -124,12 +156,22 @@ export default function DiscoveryStyleScreen() {
           <Text style={styles.stepText}>Step 5 of 6</Text>
 
           <Pressable
-            onPress={() => router.push("/complete")}
-            disabled={!canContinue}
-            style={[
-              styles.button,
-              !canContinue && styles.buttonDisabled,
-            ]}
+            style={styles.button}
+            disabled={!canContinue || isSaving}
+            onPress={async () => {
+            try {
+              setIsSaving(true);
+              await updateOnboardingDraft({
+                discovery_style: selected,
+              });
+              router.push("/complete");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Could not save your discovery style");
+            } finally {
+              setIsSaving(false);
+            }
+          }}
           >
             <Text style={styles.buttonText}>Next</Text>
           </Pressable>

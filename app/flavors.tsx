@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   View,
   Text,
@@ -7,9 +7,13 @@ import {
   SafeAreaView,
   StatusBar,
   ScrollView,
+  Alert,
 } from "react-native";
 import { router } from "expo-router";
-
+import {
+  getOnboardingDraft,
+  updateOnboardingDraft,
+} from "../lib/onboarding";
 const FLAVORS = [
   "Chocolatey",
   "Nutty",
@@ -24,7 +28,7 @@ export default function FlavorsScreen() {
   const [selected, setSelected] = useState<string[]>(["Caramel"]);
 
   const canContinue = useMemo(() => selected.length > 0, [selected]);
-
+  const [isSaving, setIsSaving] = useState(false);
   const toggleFlavor = (flavor: string) => {
     setSelected((prev) =>
       prev.includes(flavor)
@@ -32,7 +36,29 @@ export default function FlavorsScreen() {
         : [...prev, flavor]
     );
   };
+useEffect(() => {
+  let active = true;
 
+  async function loadDraft() {
+    try {
+      const draft = await getOnboardingDraft();
+      if (!active) return;
+      setSelected(
+        draft.flavor_preferences.length > 0
+          ? draft.flavor_preferences
+          : ["Caramel"]
+      );
+    } catch (error) {
+      console.error("Failed to load onboarding draft", error);
+    }
+  }
+
+  void loadDraft();
+
+  return () => {
+    active = false;
+  };
+}, []);
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" />
@@ -94,15 +120,28 @@ export default function FlavorsScreen() {
       </ScrollView>
 
       <View style={styles.footer}>
-        <Pressable
-          onPress={() => router.push("/roast")}
-          disabled={!canContinue}
-          style={[
-            styles.button,
-            !canContinue && styles.buttonDisabled,
-          ]}
+        <Pressable 
+          style={styles.button}
+          disabled={!canContinue || isSaving}
+          
+          onPress={async () => {
+            try {
+              setIsSaving(true);
+              await updateOnboardingDraft({
+                flavor_preferences: selected,
+              });
+              router.push("/roast");
+            } catch (error) {
+              console.error(error);
+              Alert.alert("Could not save your flavor preferences");
+            } finally {
+              setIsSaving(false);
+            }
+          }}
         >
-          <Text style={styles.buttonText}>Next</Text>
+          <Text style={[
+              styles.buttonText,
+              (!canContinue || isSaving) && styles.buttonDisabled]}>Next</Text>
         </Pressable>
       </View>
     </SafeAreaView>
