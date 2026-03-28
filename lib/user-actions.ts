@@ -3,6 +3,11 @@ import { supabase } from './supabase';
 export type SaveEntityType = 'bean' | 'cafe' | 'roaster';
 export type FollowEntityType = 'cafe' | 'roaster';
 export type FavoriteEntityType = 'bean' | 'cafe' | 'roaster';
+import {
+  getLatestReactionForBean,
+  setReactionForBean,
+  type BeanReaction,
+} from "../lib/reactions";
 
 export async function isEntityFavorited(
   entityType: FavoriteEntityType,

@@ -16,13 +16,14 @@ import { useFocusEffect } from "@react-navigation/native";
 import { mockBeans } from "../../lib/mock-data";
 import { getBeanBySlug, getAvailabilityByBeanId } from "../../lib/catalog";
 import {
-  isEntitySaved,
-  isEntityFollowed,
-  toggleSaveEntity,
-  toggleFollowEntity,
   isEntityFavorited,
   toggleFavoriteEntity,
 } from "../../lib/user-actions";
+import {
+  getLatestReactionForBean,
+  setReactionForBean,
+  type BeanReaction,
+} from "../../lib/reactions";
 
 type LiveBean = {
   id: string;
@@ -76,9 +77,13 @@ export default function BeanDetailScreen() {
   const [liveBean, setLiveBean] = useState<LiveBean | null>(null);
   const [liveAvailability, setLiveAvailability] = useState<LiveAvailability[]>([]);
   const [loading, setLoading] = useState(true);
+
   const [isFavorited, setIsFavorited] = useState(false);
   const [isFavoriteLoading, setIsFavoriteLoading] = useState(false);
-  
+
+  const [currentReaction, setCurrentReaction] = useState<BeanReaction | null>(null);
+  const [isReactionLoading, setIsReactionLoading] = useState(false);
+
   useEffect(() => {
     let mounted = true;
 
@@ -106,7 +111,7 @@ export default function BeanDetailScreen() {
       }
     }
 
-    load();
+    void load();
 
     return () => {
       mounted = false;
@@ -154,23 +159,32 @@ export default function BeanDetailScreen() {
     useCallback(() => {
       let active = true;
 
-      async function loadFavoriteState() {
+      async function loadScreenState() {
         try {
-          const favorited = await isEntityFavorited("bean", slug);
+          const [favorited, latestReaction] = await Promise.all([
+            isEntityFavorited("bean", slug),
+            liveBean?.id
+              ? getLatestReactionForBean(liveBean.id)
+              : Promise.resolve(null),
+          ]);
 
           if (!active) return;
+
           setIsFavorited(favorited);
+          setCurrentReaction(
+            (latestReaction?.reaction as BeanReaction | undefined) ?? null
+          );
         } catch (error) {
-          console.error("Failed to load bean favorite state", error);
+          console.error("Failed to load bean screen state", error);
         }
       }
 
-      void loadFavoriteState();
+      void loadScreenState();
 
       return () => {
         active = false;
       };
-    }, [slug])
+    }, [slug, liveBean?.id])
   );
 
   async function handleToggleFavorite() {
@@ -185,6 +199,21 @@ export default function BeanDetailScreen() {
       Alert.alert("Could not update favorite state");
     } finally {
       setIsFavoriteLoading(false);
+    }
+  }
+
+  async function handleSetReaction(nextReaction: BeanReaction) {
+    if (!liveBean?.id || isReactionLoading) return;
+
+    try {
+      setIsReactionLoading(true);
+      await setReactionForBean(liveBean.id, nextReaction);
+      setCurrentReaction(nextReaction);
+    } catch (error) {
+      console.error(error);
+      Alert.alert("Could not save reaction");
+    } finally {
+      setIsReactionLoading(false);
     }
   }
 
@@ -241,7 +270,11 @@ export default function BeanDetailScreen() {
               disabled={isFavoriteLoading}
             >
               <Text style={styles.primaryButtonText}>
-                {isFavoriteLoading ? "Updating…" : isFavorited ? "Favorited" : "Favorite"}
+                {isFavoriteLoading
+                  ? "Updating…"
+                  : isFavorited
+                    ? "Favorited"
+                    : "Favorite"}
               </Text>
             </Pressable>
           </View>
@@ -262,18 +295,43 @@ export default function BeanDetailScreen() {
 
         <Text style={styles.sectionTitle}>How was it?</Text>
         <View style={styles.reactionRow}>
-          <Pressable style={styles.reactionCard}>
-            <Text style={styles.reactionEmoji}>♥</Text>
-            <Text style={styles.reactionText}>Loved it</Text>
-          </Pressable>
-          <Pressable style={styles.reactionCard}>
-            <Text style={styles.reactionEmoji}>👍</Text>
-            <Text style={styles.reactionText}>Liked it</Text>
-          </Pressable>
-          <Pressable style={styles.reactionCard}>
-            <Text style={styles.reactionEmoji}>☹</Text>
-            <Text style={styles.reactionText}>Not for me</Text>
-          </Pressable>
+          {[
+            { value: "loved_it" as BeanReaction, emoji: "♥", label: "Loved it" },
+            { value: "liked_it" as BeanReaction, emoji: "👍", label: "Liked it" },
+            { value: "not_for_me" as BeanReaction, emoji: "☹", label: "Not for me" },
+          ].map((item) => {
+            const active = currentReaction === item.value;
+
+            return (
+              <Pressable
+                key={item.value}
+                style={[
+                  styles.reactionCard,
+                  active && styles.reactionCardActive,
+                  isReactionLoading && styles.buttonDisabled,
+                ]}
+                onPress={() => handleSetReaction(item.value)}
+                disabled={isReactionLoading || !liveBean?.id}
+              >
+                <Text
+                  style={[
+                    styles.reactionEmoji,
+                    active && styles.reactionEmojiActive,
+                  ]}
+                >
+                  {item.emoji}
+                </Text>
+                <Text
+                  style={[
+                    styles.reactionText,
+                    active && styles.reactionTextActive,
+                  ]}
+                >
+                  {item.label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         <View style={styles.sectionHeader}>
@@ -412,8 +470,6 @@ const styles = StyleSheet.create({
     fontWeight: "700",
   },
   actionRow: {
-    //flexDirection: "row",
-    //gap: 12,
     marginTop: 4,
   },
   primaryButton: {
@@ -487,15 +543,26 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
+  reactionCardActive: {
+    backgroundColor: "#E4EBDD",
+    borderWidth: 1.5,
+    borderColor: "#6F7D57",
+  },
   reactionEmoji: {
     fontSize: 18,
     color: "#7D3400",
+  },
+  reactionEmojiActive: {
+    color: "#4E5C3D",
   },
   reactionText: {
     color: "#554339",
     fontSize: 13,
     fontWeight: "700",
     textTransform: "uppercase",
+  },
+  reactionTextActive: {
+    color: "#4E5C3D",
   },
   sectionHeader: {
     flexDirection: "row",
