@@ -264,28 +264,28 @@ export default function BeanDetailScreen() {
               </Text>
             </Pressable>
           </View>
-
-          <View style={styles.heroBottom}>
-            <Text style={styles.heroEyebrow}>Bean detail</Text>
-            <Text style={styles.heroTitle}>{beanTitle}</Text>
-            <Text style={styles.heroSubtitle}>
-              {beanOrigin} • {beanProcess}
-            </Text>
-          </View>
         </View>
 
         <View style={styles.summaryCard}>
-          <View style={styles.summaryTopRow}>
-            <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
-              <Text style={styles.roasterLink}>by {beanRoasterName}</Text>
-            </Pressable>
+          <View style={styles.summaryMetaRow}>
+            <Text style={styles.originMeta}>
+              {beanOrigin} • {beanProcess}
+            </Text>
 
             <View style={styles.roastPill}>
               <Text style={styles.roastPillText}>{beanRoast}</Text>
             </View>
           </View>
 
-          <Text style={styles.summaryText}>{beanDescription}</Text>
+          <Text style={styles.title}>{beanTitle}</Text>
+
+          <Pressable onPress={() => router.push(`/roaster/${beanRoasterSlug}`)}>
+            <Text style={styles.roasterLink}>Roaster: {beanRoasterName}</Text>
+          </Pressable>
+
+          <View style={styles.matchBox}>
+            <Text style={styles.matchText}>{beanDescription}</Text>
+          </View>
 
           {primaryCafe ? (
             <View style={styles.localCue}>
@@ -425,12 +425,11 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.section,
   },
   hero: {
-    height: 380,
+    height: 240,
     backgroundColor: colors.heroDark,
-    justifyContent: "space-between",
     paddingHorizontal: spacing.screen,
     paddingTop: 20,
-    paddingBottom: spacing.xl,
+    justifyContent: "flex-start",
   },
   heroOverlay: {
     ...StyleSheet.absoluteFillObject,
@@ -459,44 +458,23 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "700",
   },
-  heroBottom: {
-    zIndex: 1,
-    gap: spacing.sm,
-  },
-  heroEyebrow: {
-    ...typography.eyebrow,
-    color: "rgba(255,255,255,0.72)",
-  },
-  heroTitle: {
-    fontSize: 42,
-    lineHeight: 46,
-    fontWeight: "700",
-    color: colors.textOnDark,
-    maxWidth: 300,
-  },
-  heroSubtitle: {
-    fontSize: 16,
-    lineHeight: 24,
-    color: "rgba(255,255,255,0.84)",
-  },
   summaryCard: {
     backgroundColor: colors.surface,
-    marginTop: -32,
+    marginTop: -44,
     marginHorizontal: spacing.screen,
     borderRadius: radius.xxl,
     padding: spacing.xl,
     gap: spacing.lg,
     ...shadows.card,
   },
-  summaryTopRow: {
+  summaryMetaRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     gap: spacing.md,
   },
-  roasterLink: {
-    ...typography.body,
-    color: colors.textSecondary,
+  originMeta: {
+    ...typography.eyebrow,
     flex: 1,
   },
   roastPill: {
@@ -510,8 +488,25 @@ const styles = StyleSheet.create({
     color: colors.successText,
     fontWeight: "700",
   },
-  summaryText: {
+  title: {
+    fontSize: 42,
+    lineHeight: 46,
+    fontWeight: "700",
+    color: colors.textPrimary,
+  },
+  roasterLink: {
+    ...typography.body,
+    color: colors.textSecondary,
+  },
+  matchBox: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+  },
+  matchText: {
     ...typography.bodyCompact,
+    color: colors.accentDeep,
+    fontWeight: "600",
   },
   localCue: {
     backgroundColor: colors.surfaceSoft,

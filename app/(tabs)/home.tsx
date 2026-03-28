@@ -10,6 +10,7 @@ import {
 import { router } from "expo-router";
 import { getHomeBeans } from "../../lib/catalog";
 import { colors, radius, shadows, spacing, typography } from "../theme";
+import { useI18n } from "../../hooks/useI18n";
 
 type LiveHomeBean = {
   id: string;
@@ -73,6 +74,8 @@ const FALLBACK_BEANS = [
 ];
 
 export default function HomeScreen() {
+  const { t } = useI18n();
+
   const [liveBeans, setLiveBeans] = useState<LiveHomeBean[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -122,6 +125,17 @@ export default function HomeScreen() {
   const heroBean = homeBeans[0];
   const freshBean = homeBeans[1] ?? homeBeans[0];
 
+  const heroNotesText = heroBean.notes.join(", ");
+  const heroDescription = t("home.notesAt", {
+    notes: heroNotesText,
+    venue: heroBean.venue,
+  });
+
+  const freshDropText = t("home.freshAt", {
+    freshness: freshBean.freshness,
+    venue: freshBean.venue,
+  });
+
   return (
     <ScrollView
       style={styles.screen}
@@ -134,29 +148,19 @@ export default function HomeScreen() {
       </View>
 
       <View style={styles.introBlock}>
-        <Text style={styles.eyebrow}>Today’s discovery</Text>
-        <Text style={styles.title}>Good evening.</Text>
-        <Text style={styles.subtitle}>
-          A calmer way to find beans that fit your taste, nearby right now.
-        </Text>
+        <Text style={styles.eyebrow}>{t("home.eyebrow")}</Text>
+        <Text style={styles.title}>{t("home.greeting")}</Text>
+        <Text style={styles.subtitle}>{t("home.subtitle")}</Text>
       </View>
-
-      {/* <Pressable
-        style={styles.searchBox}
-        onPress={() => router.push("/(tabs)/explore")}
-      >
-        <Text style={styles.searchText}>Search beans, roasters, or cafés...</Text>
-        <Text style={styles.searchHint}>Explore</Text>
-      </Pressable> */}
 
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderText}>
-          <Text style={styles.sectionEyebrow}>For you</Text>
-          <Text style={styles.sectionTitle}>Best matches nearby</Text>
+          <Text style={styles.sectionEyebrow}>{t("home.forYou")}</Text>
+          <Text style={styles.sectionTitle}>{t("home.bestMatches")}</Text>
         </View>
 
         <Pressable onPress={() => router.push("/(tabs)/explore")}>
-          <Text style={styles.sectionLink}>See all</Text>
+          <Text style={styles.sectionLink}>{t("common.seeAll")}</Text>
         </Pressable>
       </View>
 
@@ -176,22 +180,19 @@ export default function HomeScreen() {
 
           <Text style={styles.heroTitle}>{heroBean.name}</Text>
 
-          <Text style={styles.heroDescription}>
-            Notes of {heroBean.notes.join(", ").toLowerCase()} — available at{" "}
-            {heroBean.venue}.
-          </Text>
+          <Text style={styles.heroDescription}>{heroDescription}</Text>
 
           <View style={styles.heroFooter}>
             <Text style={styles.heroFreshness}>{heroBean.freshness}</Text>
-            <Text style={styles.heroAction}>Open bean</Text>
+            <Text style={styles.heroAction}>{t("home.openBean")}</Text>
           </View>
         </View>
       </Pressable>
 
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderText}>
-          <Text style={styles.sectionEyebrow}>Freshness</Text>
-          <Text style={styles.sectionTitle}>Fresh drops today</Text>
+          <Text style={styles.sectionEyebrow}>{t("home.freshness")}</Text>
+          <Text style={styles.sectionTitle}>{t("home.freshDrops")}</Text>
         </View>
       </View>
 
@@ -201,9 +202,7 @@ export default function HomeScreen() {
       >
         <View style={styles.featureTextBlock}>
           <Text style={styles.featureTitle}>{freshBean.name}</Text>
-          <Text style={styles.featureText}>
-            {freshBean.freshness} at {freshBean.venue}.
-          </Text>
+          <Text style={styles.featureText}>{freshDropText}</Text>
         </View>
 
         <View style={styles.featureBadge}>
@@ -213,17 +212,14 @@ export default function HomeScreen() {
 
       <View style={styles.sectionHeader}>
         <View style={styles.sectionHeaderText}>
-          <Text style={styles.sectionEyebrow}>Taste cue</Text>
-          <Text style={styles.sectionTitle}>What suits you lately</Text>
+          <Text style={styles.sectionEyebrow}>{t("home.tasteCue")}</Text>
+          <Text style={styles.sectionTitle}>{t("home.tasteDirection")}</Text>
         </View>
       </View>
 
       <View style={styles.insightCard}>
-        <Text style={styles.insightTitle}>Bright, floral, and clean.</Text>
-        <Text style={styles.insightText}>
-          Your recent profile leans toward lighter, expressive coffees with a
-          softer filter-friendly feel.
-        </Text>
+        <Text style={styles.insightTitle}>{t("home.insightTitle")}</Text>
+        <Text style={styles.insightText}>{t("home.insightText")}</Text>
 
         <View style={styles.insightTags}>
           {heroBean.notes.map((note) => (
@@ -270,27 +266,6 @@ const styles = StyleSheet.create({
   subtitle: {
     ...typography.body,
     maxWidth: 320,
-  },
-  searchBox: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.lg,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
-    marginBottom: spacing.section,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  searchText: {
-    color: colors.textTertiary,
-    fontSize: 15,
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  searchHint: {
-    color: colors.accentPrimary,
-    fontSize: 14,
-    fontWeight: "700",
   },
   sectionHeader: {
     flexDirection: "row",
